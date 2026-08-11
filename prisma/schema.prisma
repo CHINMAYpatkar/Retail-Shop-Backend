@@ -311,8 +311,9 @@ model Product {
   metaTitle          String?
   metaDescription    String?
 
-  categoryId         String
-  category           Category  @relation(fields: [categoryId], references: [id])
+  // A deleted product may be retained for order history after its category is removed.
+  categoryId         String?
+  category           Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   images             ProductImage[]
   variants           ProductVariant[]

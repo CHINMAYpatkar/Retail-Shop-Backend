@@ -30,7 +30,9 @@ export class CustomerAuthService {
     let customer = await this.prisma.customer.findUnique({ where: { email: dto.email } });
 
     if (customer?.emailVerifiedAt) {
-      throw new BadRequestException('An account with this email already exists. Please login instead.');
+      throw new BadRequestException(
+        'An account with this email already exists. Please login instead.',
+      );
     }
 
     if (!customer) {

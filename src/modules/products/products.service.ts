@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { slugify } from '../../common/utils/slugify';
@@ -163,7 +163,9 @@ export class ProductsService {
     let slug = slugify(base);
     let attempt = 0;
     while (
-      await this.prisma.product.findFirst({ where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) } })
+      await this.prisma.product.findFirst({
+        where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      })
     ) {
       attempt += 1;
       slug = `${slugify(base)}-${attempt + 1}`;
@@ -199,11 +201,15 @@ export class ProductsService {
     return this.prisma.$transaction(async (tx) => {
       if (images) {
         await tx.productImage.deleteMany({ where: { productId: id } });
-        await tx.productImage.createMany({ data: images.map((img) => ({ ...img, productId: id })) });
+        await tx.productImage.createMany({
+          data: images.map((img) => ({ ...img, productId: id })),
+        });
       }
       if (variants) {
         await tx.productVariant.deleteMany({ where: { productId: id } });
-        await tx.productVariant.createMany({ data: variants.map((v) => ({ ...v, productId: id })) });
+        await tx.productVariant.createMany({
+          data: variants.map((v) => ({ ...v, productId: id })),
+        });
       }
       if (ingredientIds) {
         await tx.productIngredient.deleteMany({ where: { productId: id } });
@@ -228,12 +234,23 @@ export class ProductsService {
   /** Soft delete: keeps order history intact while hiding the product from the storefront. */
   async remove(id: string) {
     await this.findOneAdmin(id);
-    await this.prisma.product.update({ where: { id }, data: { deletedAt: new Date(), isActive: false } });
+    await this.prisma.product.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+    });
     return { message: 'Product deleted (soft delete)' };
   }
 
   async restore(id: string) {
-    await this.findOneAdmin(id);
-    return this.prisma.product.update({ where: { id }, data: { deletedAt: null } });
+    const product = await this.findOneAdmin(id);
+    if (!product.categoryId) {
+      throw new ConflictException(
+        'Cannot restore this product because its category has been deleted. Assign it to a category first.',
+      );
+    }
+    return this.prisma.product.update({
+      where: { id },
+      data: { deletedAt: null, isActive: true },
+    });
   }
 }

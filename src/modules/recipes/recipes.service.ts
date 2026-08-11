@@ -12,7 +12,9 @@ export class RecipesService {
     return this.prisma.recipe.findMany({
       where: { isActive: true },
       orderBy: { createdAt: 'desc' },
-      include: { products: { include: { product: { select: { id: true, name: true, slug: true } } } } },
+      include: {
+        products: { include: { product: { select: { id: true, name: true, slug: true } } } },
+      },
     });
   }
 
@@ -21,7 +23,9 @@ export class RecipesService {
       where: { slug, isActive: true },
       include: {
         ingredients: { include: { ingredient: true } },
-        products: { include: { product: { select: { id: true, name: true, slug: true, price: true } } } },
+        products: {
+          include: { product: { select: { id: true, name: true, slug: true, price: true } } },
+        },
       },
     });
     if (!recipe) throw new NotFoundException('Recipe not found');
@@ -38,7 +42,10 @@ export class RecipesService {
   async findOneAdmin(id: string) {
     const recipe = await this.prisma.recipe.findUnique({
       where: { id },
-      include: { ingredients: { include: { ingredient: true } }, products: { include: { product: true } } },
+      include: {
+        ingredients: { include: { ingredient: true } },
+        products: { include: { product: true } },
+      },
     });
     if (!recipe) throw new NotFoundException('Recipe not found');
     return recipe;
@@ -48,7 +55,9 @@ export class RecipesService {
     let slug = slugify(base);
     let attempt = 0;
     while (
-      await this.prisma.recipe.findFirst({ where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) } })
+      await this.prisma.recipe.findFirst({
+        where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      })
     ) {
       attempt += 1;
       slug = `${slugify(base)}-${attempt + 1}`;
@@ -66,9 +75,16 @@ export class RecipesService {
         slug,
         steps: rest.steps as any,
         ingredients: ingredients
-          ? { create: ingredients.map((i) => ({ ingredientId: i.ingredientId, quantity: i.quantity })) }
+          ? {
+              create: ingredients.map((i) => ({
+                ingredientId: i.ingredientId,
+                quantity: i.quantity,
+              })),
+            }
           : undefined,
-        products: productIds ? { create: productIds.map((productId) => ({ productId })) } : undefined,
+        products: productIds
+          ? { create: productIds.map((productId) => ({ productId })) }
+          : undefined,
       },
       include: { ingredients: true, products: true },
     });
@@ -85,12 +101,18 @@ export class RecipesService {
       if (ingredients) {
         await tx.recipeIngredient.deleteMany({ where: { recipeId: id } });
         await tx.recipeIngredient.createMany({
-          data: ingredients.map((i) => ({ recipeId: id, ingredientId: i.ingredientId, quantity: i.quantity })),
+          data: ingredients.map((i) => ({
+            recipeId: id,
+            ingredientId: i.ingredientId,
+            quantity: i.quantity,
+          })),
         });
       }
       if (productIds) {
         await tx.recipeProduct.deleteMany({ where: { recipeId: id } });
-        await tx.recipeProduct.createMany({ data: productIds.map((productId) => ({ recipeId: id, productId })) });
+        await tx.recipeProduct.createMany({
+          data: productIds.map((productId) => ({ recipeId: id, productId })),
+        });
       }
       return tx.recipe.update({
         where: { id },

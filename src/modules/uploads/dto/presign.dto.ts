@@ -1,7 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString } from 'class-validator';
 
-const ALLOWED_FOLDERS = ['products', 'banners', 'recipes', 'reviews', 'blogs', 'ingredients', 'categories', 'misc'];
+const ALLOWED_FOLDERS = [
+  'products',
+  'banners',
+  'recipes',
+  'reviews',
+  'blogs',
+  'ingredients',
+  'categories',
+  'misc',
+];
 
 export class PresignDto {
   @ApiProperty()

@@ -59,86 +59,91 @@ export class OrdersService {
 
     // Snapshot pricing/stock at checkout time inside a transaction so nothing
     // moves between the check and the deduction.
-    return this.prisma.$transaction(async (tx) => {
-      let subtotal = 0;
-      const orderItemsData: Prisma.OrderItemCreateManyOrderInput[] = [];
+    return this.prisma
+      .$transaction(async (tx) => {
+        let subtotal = 0;
+        const orderItemsData: Prisma.OrderItemCreateManyOrderInput[] = [];
 
-      for (const item of cartItems) {
-        if (!item.product.isActive || item.product.deletedAt) {
-          throw new BadRequestException(`"${item.product.name}" is no longer available`);
+        for (const item of cartItems) {
+          if (!item.product.isActive || item.product.deletedAt) {
+            throw new BadRequestException(`"${item.product.name}" is no longer available`);
+          }
+
+          let unitPrice = Number(item.product.price);
+          if (item.variantId) {
+            const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
+            if (!variant)
+              throw new BadRequestException('A selected product option is no longer available');
+            if (variant.stockQuantity < item.quantity) {
+              throw new BadRequestException(
+                `Not enough stock for "${item.product.name}" (${variant.name})`,
+              );
+            }
+            if (variant.priceOverride) unitPrice = Number(variant.priceOverride);
+            await tx.productVariant.update({
+              where: { id: variant.id },
+              data: { stockQuantity: { decrement: item.quantity } },
+            });
+          } else {
+            if (item.product.stockQuantity < item.quantity) {
+              throw new BadRequestException(`Not enough stock for "${item.product.name}"`);
+            }
+            await tx.product.update({
+              where: { id: item.product.id },
+              data: { stockQuantity: { decrement: item.quantity } },
+            });
+          }
+
+          const totalPrice = unitPrice * item.quantity;
+          subtotal += totalPrice;
+          orderItemsData.push({
+            productId: item.productId,
+            variantId: item.variantId,
+            productName: item.product.name,
+            unitPrice,
+            quantity: item.quantity,
+            totalPrice,
+          });
         }
 
-        let unitPrice = Number(item.product.price);
-        if (item.variantId) {
-          const variant = await tx.productVariant.findUnique({ where: { id: item.variantId } });
-          if (!variant) throw new BadRequestException('A selected product option is no longer available');
-          if (variant.stockQuantity < item.quantity) {
-            throw new BadRequestException(`Not enough stock for "${item.product.name}" (${variant.name})`);
-          }
-          if (variant.priceOverride) unitPrice = Number(variant.priceOverride);
-          await tx.productVariant.update({
-            where: { id: variant.id },
-            data: { stockQuantity: { decrement: item.quantity } },
-          });
-        } else {
-          if (item.product.stockQuantity < item.quantity) {
-            throw new BadRequestException(`Not enough stock for "${item.product.name}"`);
-          }
-          await tx.product.update({
-            where: { id: item.product.id },
-            data: { stockQuantity: { decrement: item.quantity } },
-          });
+        const shippingAmount = 0; // flat/free for now - future-ready field for shipping rules
+        const taxAmount = 0; // future-ready field for tax rules
+        const totalAmount = subtotal + shippingAmount + taxAmount;
+
+        let orderNumber = generateOrderNumber();
+        // Extremely unlikely, but guard against the rare random collision.
+        // eslint-disable-next-line no-constant-condition
+        while (await tx.order.findUnique({ where: { orderNumber } })) {
+          orderNumber = generateOrderNumber();
         }
 
-        const totalPrice = unitPrice * item.quantity;
-        subtotal += totalPrice;
-        orderItemsData.push({
-          productId: item.productId,
-          variantId: item.variantId,
-          productName: item.product.name,
-          unitPrice,
-          quantity: item.quantity,
-          totalPrice,
+        const order = await tx.order.create({
+          data: {
+            orderNumber,
+            customerId,
+            addressId: dto.addressId,
+            paymentMethod: dto.paymentMethod ?? 'COD',
+            subtotal,
+            taxAmount,
+            shippingAmount,
+            totalAmount,
+            items: { createMany: { data: orderItemsData } },
+            statusHistory: { create: { status: 'PLACED', note: 'Order placed by customer' } },
+          },
+          include: ORDER_INCLUDE,
         });
-      }
 
-      const shippingAmount = 0; // flat/free for now - future-ready field for shipping rules
-      const taxAmount = 0; // future-ready field for tax rules
-      const totalAmount = subtotal + shippingAmount + taxAmount;
+        await tx.cartItem.deleteMany({ where: { customerId } });
 
-      let orderNumber = generateOrderNumber();
-      // Extremely unlikely, but guard against the rare random collision.
-      // eslint-disable-next-line no-constant-condition
-      while (await tx.order.findUnique({ where: { orderNumber } })) {
-        orderNumber = generateOrderNumber();
-      }
-
-      const order = await tx.order.create({
-        data: {
-          orderNumber,
-          customerId,
-          addressId: dto.addressId,
-          paymentMethod: dto.paymentMethod ?? 'COD',
-          subtotal,
-          taxAmount,
-          shippingAmount,
-          totalAmount,
-          items: { createMany: { data: orderItemsData } },
-          statusHistory: { create: { status: 'PLACED', note: 'Order placed by customer' } },
-        },
-        include: ORDER_INCLUDE,
+        return order;
+      })
+      .then(async (order) => {
+        const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
+        if (customer) {
+          await this.mail.sendOrderStatusEmail(customer.email, order.orderNumber, 'Placed');
+        }
+        return order;
       });
-
-      await tx.cartItem.deleteMany({ where: { customerId } });
-
-      return order;
-    }).then(async (order) => {
-      const customer = await this.prisma.customer.findUnique({ where: { id: customerId } });
-      if (customer) {
-        await this.mail.sendOrderStatusEmail(customer.email, order.orderNumber, 'Placed');
-      }
-      return order;
-    });
   }
 
   findAllForCustomer(customerId: string) {
@@ -159,9 +164,16 @@ export class OrdersService {
   async cancelByCustomer(customerId: string, id: string, reason?: string) {
     const order = await this.findOneForCustomer(customerId, id);
     if (!CUSTOMER_CANCELLABLE.includes(order.status)) {
-      throw new BadRequestException(`Orders in "${order.status}" status can no longer be cancelled`);
+      throw new BadRequestException(
+        `Orders in "${order.status}" status can no longer be cancelled`,
+      );
     }
-    return this.transitionStatus(order.id, 'CANCELLED', reason || 'Cancelled by customer', 'customer');
+    return this.transitionStatus(
+      order.id,
+      'CANCELLED',
+      reason || 'Cancelled by customer',
+      'customer',
+    );
   }
 
   // ---------- Admin ----------

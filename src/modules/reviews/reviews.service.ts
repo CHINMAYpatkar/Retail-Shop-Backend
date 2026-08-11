@@ -47,7 +47,11 @@ export class ReviewsService {
   async findAllForProduct(productId: string, query: QueryReviewsDto) {
     const { page = 1, limit = 10, sort } = query;
     const orderBy: Prisma.ReviewOrderByWithRelationInput =
-      sort === 'highest' ? { rating: 'desc' } : sort === 'lowest' ? { rating: 'asc' } : { createdAt: 'desc' };
+      sort === 'highest'
+        ? { rating: 'desc' }
+        : sort === 'lowest'
+          ? { rating: 'asc' }
+          : { createdAt: 'desc' };
 
     const where: Prisma.ReviewWhereInput = { productId, status: 'APPROVED' };
     const [items, total, ratingAgg] = await this.prisma.$transaction([

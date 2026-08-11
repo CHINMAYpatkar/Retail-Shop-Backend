@@ -31,7 +31,10 @@ export class CategoriesService {
 
   findAllAdmin() {
     return this.prisma.category.findMany({
-      include: { parent: { select: { id: true, name: true } }, _count: { select: { products: true, children: true } } },
+      include: {
+        parent: { select: { id: true, name: true } },
+        _count: { select: { products: true, children: true } },
+      },
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -75,9 +78,15 @@ export class CategoriesService {
   }
 
   async remove(id: string) {
-    const category = await this.findOneAdmin(id);
-    if (category._count.products > 0) {
-      throw new ConflictException('Cannot delete a category that still has products. Move or delete those products first.');
+    await this.findOneAdmin(id);
+
+    const nonDeletedProductCount = await this.prisma.product.count({
+      where: { categoryId: id, deletedAt: null },
+    });
+    if (nonDeletedProductCount > 0) {
+      throw new ConflictException(
+        'Cannot delete a category that still has products. Move or delete those products first.',
+      );
     }
     await this.prisma.category.delete({ where: { id } });
     return { message: 'Category deleted' };

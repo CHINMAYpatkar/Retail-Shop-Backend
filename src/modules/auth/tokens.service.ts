@@ -33,7 +33,11 @@ export class TokensService {
 
   // ---------- CUSTOMER ----------
 
-  async issueCustomerTokens(customerId: string, email: string, meta: RequestMeta = {}): Promise<TokenPair> {
+  async issueCustomerTokens(
+    customerId: string,
+    email: string,
+    meta: RequestMeta = {},
+  ): Promise<TokenPair> {
     const tokenId = uuidv4();
     const accessToken = this.jwt.sign(
       { sub: customerId, email },
@@ -77,7 +81,9 @@ export class TokensService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const record = await this.prisma.customerRefreshToken.findUnique({ where: { id: payload.tokenId } });
+    const record = await this.prisma.customerRefreshToken.findUnique({
+      where: { id: payload.tokenId },
+    });
     if (!record || record.revokedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token is no longer valid');
     }
@@ -113,7 +119,11 @@ export class TokensService {
 
   // ---------- ADMIN ----------
 
-  async issueAdminTokens(adminId: string, email: string, meta: RequestMeta = {}): Promise<TokenPair> {
+  async issueAdminTokens(
+    adminId: string,
+    email: string,
+    meta: RequestMeta = {},
+  ): Promise<TokenPair> {
     const tokenId = uuidv4();
     const accessToken = this.jwt.sign(
       { sub: adminId, email },
@@ -157,7 +167,9 @@ export class TokensService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    const record = await this.prisma.adminRefreshToken.findUnique({ where: { id: payload.tokenId } });
+    const record = await this.prisma.adminRefreshToken.findUnique({
+      where: { id: payload.tokenId },
+    });
     if (!record || record.revokedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException('Refresh token is no longer valid');
     }
@@ -192,6 +204,8 @@ export class TokensService {
 
   private decodeExpiry(token: string): Date {
     const decoded: any = this.jwt.decode(token);
-    return decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    return decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   }
 }

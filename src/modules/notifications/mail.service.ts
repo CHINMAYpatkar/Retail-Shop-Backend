@@ -58,7 +58,6 @@
 //   }
 // }
 
-
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
@@ -121,7 +120,11 @@ export class MailService implements OnModuleInit {
     }
   }
 
-  async sendMail(to: string, subject: string, bodyHtml: string): Promise<{ success: boolean; error?: string }> {
+  async sendMail(
+    to: string,
+    subject: string,
+    bodyHtml: string,
+  ): Promise<{ success: boolean; error?: string }> {
     const html = renderEmailShell(bodyHtml);
     const attempt = async () =>
       this.transporter.sendMail({ from: this.config.get('smtp.from'), to, subject, html });
@@ -130,7 +133,9 @@ export class MailService implements OnModuleInit {
       await attempt();
       return { success: true };
     } catch (firstError) {
-      this.logger.warn(`Email send failed (attempt 1/2) to ${to}: ${(firstError as Error).message}`);
+      this.logger.warn(
+        `Email send failed (attempt 1/2) to ${to}: ${(firstError as Error).message}`,
+      );
       try {
         await attempt();
         return { success: true };

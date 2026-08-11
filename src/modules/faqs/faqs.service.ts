@@ -8,7 +8,10 @@ export class FaqsService {
   constructor(private prisma: PrismaService) {}
 
   findAllPublic() {
-    return this.prisma.faqItem.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
+    return this.prisma.faqItem.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
   }
 
   findAllAdmin() {

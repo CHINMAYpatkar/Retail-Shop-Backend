@@ -29,7 +29,11 @@ export class SupportAdminController {
   }
 
   @Post(':id/messages')
-  reply(@Param('id') id: string, @Body() dto: AddMessageDto, @CurrentUser('name') adminName: string) {
+  reply(
+    @Param('id') id: string,
+    @Body() dto: AddMessageDto,
+    @CurrentUser('name') adminName: string,
+  ) {
     return this.service.addAdminReply(id, dto.message, adminName);
   }
 

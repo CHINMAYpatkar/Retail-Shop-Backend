@@ -13,7 +13,12 @@ export class BlogsService {
     const { page = 1, limit = 10 } = query;
     const where = { isPublished: true };
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.blog.findMany({ where, orderBy: { publishedAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.blog.findMany({
+        where,
+        orderBy: { publishedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
       this.prisma.blog.count({ where }),
     ]);
     return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -38,7 +43,11 @@ export class BlogsService {
   private async ensureUniqueSlug(base: string, excludeId?: string): Promise<string> {
     let slug = slugify(base);
     let attempt = 0;
-    while (await this.prisma.blog.findFirst({ where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) } })) {
+    while (
+      await this.prisma.blog.findFirst({
+        where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      })
+    ) {
       attempt += 1;
       slug = `${slugify(base)}-${attempt + 1}`;
     }

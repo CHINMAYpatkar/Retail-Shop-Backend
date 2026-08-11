@@ -2,7 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class UpsertCmsPageDto {
-  @ApiProperty({ example: 'about', description: 'URL slug, e.g. about, contact, privacy, terms, refund-policy' })
+  @ApiProperty({
+    example: 'about',
+    description: 'URL slug, e.g. about, contact, privacy, terms, refund-policy',
+  })
   @IsString()
   slug: string;
 

@@ -1,4 +1,9 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 
@@ -20,7 +25,9 @@ export class CartService {
       items.map(async (item) => {
         let unitPrice = Number(item.product.price);
         if (item.variantId) {
-          const variant = await this.prisma.productVariant.findUnique({ where: { id: item.variantId } });
+          const variant = await this.prisma.productVariant.findUnique({
+            where: { id: item.variantId },
+          });
           if (variant?.priceOverride) unitPrice = Number(variant.priceOverride);
         }
         const lineTotal = unitPrice * item.quantity;
@@ -50,15 +57,17 @@ export class CartService {
     }
 
     const quantity = dto.quantity ?? 1;
-    const existing = await this.prisma.cartItem.findUnique({
-      where: {
-        customerId_productId_variantId: {
-          customerId,
-          productId: dto.productId,
-          variantId: dto.variantId ?? null,
-        } as any,
-      },
-    }).catch(() => null);
+    const existing = await this.prisma.cartItem
+      .findUnique({
+        where: {
+          customerId_productId_variantId: {
+            customerId,
+            productId: dto.productId,
+            variantId: dto.variantId ?? null,
+          } as any,
+        },
+      })
+      .catch(() => null);
 
     if (existing) {
       return this.prisma.cartItem.update({

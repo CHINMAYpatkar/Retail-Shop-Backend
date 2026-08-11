@@ -32,7 +32,9 @@ export class IngredientsService {
     let slug = slugify(base);
     let attempt = 0;
     while (
-      await this.prisma.ingredient.findFirst({ where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) } })
+      await this.prisma.ingredient.findFirst({
+        where: { slug, ...(excludeId ? { id: { not: excludeId } } : {}) },
+      })
     ) {
       attempt += 1;
       slug = `${slugify(base)}-${attempt + 1}`;

@@ -30,7 +30,9 @@ export class SupportService {
         name: dto.name,
         email: dto.email,
         subject: dto.subject,
-        messages: { create: { senderType: 'customer', senderName: dto.name, message: dto.message } },
+        messages: {
+          create: { senderType: 'customer', senderName: dto.name, message: dto.message },
+        },
       },
       include: TICKET_INCLUDE,
     });
@@ -53,7 +55,10 @@ export class SupportService {
   }
 
   async findOneForCustomer(customerId: string, id: string) {
-    const ticket = await this.prisma.supportTicket.findUnique({ where: { id }, include: TICKET_INCLUDE });
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id },
+      include: TICKET_INCLUDE,
+    });
     if (!ticket) throw new NotFoundException('Ticket not found');
     if (ticket.customerId !== customerId) throw new ForbiddenException('Not your ticket');
     return ticket;
@@ -65,9 +70,15 @@ export class SupportService {
       data: { ticketId: ticket.id, senderType: 'customer', senderName: ticket.name, message },
     });
     if (ticket.status === 'RESOLVED' || ticket.status === 'CLOSED') {
-      await this.prisma.supportTicket.update({ where: { id: ticket.id }, data: { status: 'OPEN' } });
+      await this.prisma.supportTicket.update({
+        where: { id: ticket.id },
+        data: { status: 'OPEN' },
+      });
     }
-    return this.prisma.supportTicket.findUnique({ where: { id: ticket.id }, include: TICKET_INCLUDE });
+    return this.prisma.supportTicket.findUnique({
+      where: { id: ticket.id },
+      include: TICKET_INCLUDE,
+    });
   }
 
   // ---------- Admin ----------
@@ -101,7 +112,10 @@ export class SupportService {
   }
 
   async findOneAdmin(id: string) {
-    const ticket = await this.prisma.supportTicket.findUnique({ where: { id }, include: TICKET_INCLUDE });
+    const ticket = await this.prisma.supportTicket.findUnique({
+      where: { id },
+      include: TICKET_INCLUDE,
+    });
     if (!ticket) throw new NotFoundException('Ticket not found');
     return ticket;
   }
@@ -112,14 +126,20 @@ export class SupportService {
       data: { ticketId: ticket.id, senderType: 'admin', senderName: adminName, message },
     });
     if (ticket.status === 'OPEN') {
-      await this.prisma.supportTicket.update({ where: { id: ticket.id }, data: { status: 'IN_PROGRESS' } });
+      await this.prisma.supportTicket.update({
+        where: { id: ticket.id },
+        data: { status: 'IN_PROGRESS' },
+      });
     }
     await this.mail.sendMail(
       ticket.email,
       `Update on your ticket - ${ticket.ticketNumber}`,
       `<p>${message}</p>`,
     );
-    return this.prisma.supportTicket.findUnique({ where: { id: ticket.id }, include: TICKET_INCLUDE });
+    return this.prisma.supportTicket.findUnique({
+      where: { id: ticket.id },
+      include: TICKET_INCLUDE,
+    });
   }
 
   async updateStatus(id: string, status: TicketStatus) {

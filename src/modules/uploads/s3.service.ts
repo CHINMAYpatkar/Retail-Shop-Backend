@@ -28,7 +28,11 @@ export class S3Service {
    */
   async getPresignedUploadUrl(fileName: string, contentType: string, folder = 'uploads') {
     const key = `${folder}/${uuidv4()}-${fileName.replace(/\s+/g, '-')}`;
-    const command = new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: contentType });
+    const command = new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      ContentType: contentType,
+    });
     const uploadUrl = await getSignedUrl(this.client, command, { expiresIn: 300 });
     const publicUrl = `https://${this.bucket}.s3.${this.config.get('aws.region')}.amazonaws.com/${key}`;
     return { uploadUrl, key, publicUrl };
