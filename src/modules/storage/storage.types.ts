@@ -20,8 +20,8 @@ export interface StoredObject {
    * forever; only the resolver changes. See ADR 0008.
    */
   storageKey: string;
-  /** Resolved at write time for convenience; always re-derivable from storageKey. */
-  url: string;
+  /** Resolved at write time for convenience; null for private assets. */
+  url: string | null;
   sizeBytes: number;
   mimeType: string;
   category: MediaCategory;
@@ -36,8 +36,11 @@ export interface StorageDriver {
   /** Removes the object. Must not throw if it is already gone. */
   delete(storageKey: string): Promise<void>;
 
-  /** Resolves the public URL for a key. Cheap and synchronous by design. */
-  publicUrl(storageKey: string): string;
+  /**
+   * Resolves the public URL for a key, or null when the asset is private and
+   * must be streamed through a guarded route instead.
+   */
+  publicUrl(storageKey: string): string | null;
 
   /**
    * Absolute filesystem path for a key, for streaming private files through a

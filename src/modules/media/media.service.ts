@@ -76,7 +76,9 @@ export class MediaService {
         storageKey: dto.storageKey,
         // Only stamp a driver when we actually own the bytes.
         driver: dto.storageKey ? this.currentDriver() : null,
-        url: dto.storageKey ? this.storage.publicUrl(dto.storageKey) : dto.url!,
+        // Private assets resolve to null and are streamed through a guarded
+        // route; the column stores an empty string rather than a URL that 404s.
+        url: dto.storageKey ? (this.storage.publicUrl(dto.storageKey) ?? '') : dto.url!,
         uploadedBy,
       },
     });
@@ -105,6 +107,7 @@ export class MediaService {
       ...asset,
       url: asset.storageKey ? this.storage.publicUrl(asset.storageKey) : asset.url,
       isUploaded: Boolean(asset.storageKey),
+      isPrivate: Boolean(asset.storageKey && !this.storage.publicUrl(asset.storageKey)),
     };
   }
 
