@@ -30,6 +30,7 @@ import { BannersModule } from './modules/banners/banners.module';
 import { CmsPagesModule } from './modules/cms-pages/cms-pages.module';
 import { BlogsModule } from './modules/blogs/blogs.module';
 import { FaqsModule } from './modules/faqs/faqs.module';
+import { StorageModule } from './modules/storage/storage.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { MediaModule } from './modules/media/media.module';
 import { SupportModule } from './modules/support/support.module';
@@ -53,6 +54,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
       ],
     }),
     PrismaModule,
+    StorageModule,
     NotificationsModule,
     AuthModule,
     PermissionsModule,

@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsNotEmpty, IsNumberString, IsOptional, validateSync } from 'class-validator';
+import { IsEnum, IsIn, IsNotEmpty, IsNumberString, IsOptional, validateSync } from 'class-validator';
 
 enum NodeEnv {
   Development = 'development',
@@ -30,6 +30,13 @@ class EnvironmentVariables {
 
   @IsNotEmpty()
   ADMIN_JWT_REFRESH_SECRET: string;
+
+  @IsIn(['local', 's3'])
+  @IsOptional()
+  STORAGE_DRIVER: string;
+
+  @IsOptional()
+  UPLOAD_DIR: string;
 }
 
 export function validate(config: Record<string, unknown>) {

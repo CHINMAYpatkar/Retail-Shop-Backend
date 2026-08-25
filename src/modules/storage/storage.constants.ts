@@ -1,0 +1,56 @@
+/**
+ * Single source of truth for what may be uploaded.
+ *
+ * Keyed by MIME type, and the extension comes from THIS map - never from the
+ * client-supplied filename. A filename is attacker-controlled, so trusting its
+ * extension is how an "image" ends up on disk as `.html` or `.js`.
+ */
+export type MediaCategory = 'image' | 'video' | 'document';
+
+export const ALLOWED_MIME_TYPES: Readonly<Record<string, { ext: string; category: MediaCategory }>> =
+  {
+    'image/jpeg': { ext: 'jpg', category: 'image' },
+    'image/png': { ext: 'png', category: 'image' },
+    'image/webp': { ext: 'webp', category: 'image' },
+    'image/avif': { ext: 'avif', category: 'image' },
+    'video/mp4': { ext: 'mp4', category: 'video' },
+    'video/webm': { ext: 'webm', category: 'video' },
+    'application/pdf': { ext: 'pdf', category: 'document' },
+  };
+
+export function isAllowedMimeType(mimeType: string): boolean {
+  return Object.prototype.hasOwnProperty.call(ALLOWED_MIME_TYPES, mimeType);
+}
+
+export function extensionForMimeType(mimeType: string): string {
+  return ALLOWED_MIME_TYPES[mimeType]?.ext ?? 'bin';
+}
+
+export function categoryForMimeType(mimeType: string): MediaCategory | undefined {
+  return ALLOWED_MIME_TYPES[mimeType]?.category;
+}
+
+/**
+ * Upload folders are part of the on-disk path, so they are an allowlist rather
+ * than free text - anything else is a path-traversal vector.
+ */
+export const UPLOAD_FOLDERS = [
+  'products',
+  'categories',
+  'ingredients',
+  'recipes',
+  'banners',
+  'blogs',
+  'reviews',
+  'bills',
+  'misc',
+] as const;
+
+export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
+
+/** Folders whose contents must NOT be publicly served - business/financial records. */
+export const PRIVATE_FOLDERS: readonly UploadFolder[] = ['bills'];
+
+export function isPrivateFolder(folder: string): boolean {
+  return (PRIVATE_FOLDERS as readonly string[]).includes(folder);
+}
