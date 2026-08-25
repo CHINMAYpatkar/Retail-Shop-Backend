@@ -5,6 +5,10 @@ dist/
 coverage/
 .DS_Store
 
+# IDE / editor state
+.vs/
+.idea/
+
 # Locally-uploaded media. Never commit these - and note they are NOT part of the
 # deploy artifact either, so they need their own volume + backup. See ADR 0008.
 uploads/
