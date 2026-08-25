@@ -37,6 +37,19 @@ export default () => ({
     from: process.env.SMTP_FROM || 'Retail Shop <no-reply@retailshop.com>',
   },
 
+  storage: {
+    // 'local' | 's3' - see ADR 0008. S3 stays unimplemented until AWS is set up.
+    driver: process.env.STORAGE_DRIVER || 'local',
+    uploadDir: process.env.UPLOAD_DIR || './uploads',
+    // How stored files are addressed publicly. In production this is the API's
+    // public origin (or a CDN in front of it), not localhost.
+    publicBaseUrl: process.env.PUBLIC_BASE_URL || `http://localhost:${process.env.PORT || '4000'}`,
+    publicPathPrefix: '/uploads',
+    maxImageSizeMb: parseInt(process.env.MAX_IMAGE_SIZE_MB || '5', 10),
+    maxVideoSizeMb: parseInt(process.env.MAX_VIDEO_SIZE_MB || '200', 10),
+    maxDocumentSizeMb: parseInt(process.env.MAX_DOCUMENT_SIZE_MB || '10', 10),
+  },
+
   aws: {
     region: process.env.AWS_REGION,
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -45,12 +58,12 @@ export default () => ({
   },
 
   cors: {
-    origins: (
-      process.env.CORS_ORIGINS ||
-      'http://localhost:3000' ||
-      'http://localhost:3001' ||
-      'http://localhost:3002'
-    ).split(','),
+    // Note: this was previously `a || b || c`, which always evaluates to `a` -
+    // the storefront/extra ports were never actually in the default list.
+    origins: (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:3001')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
   },
 
   throttle: {

@@ -4,4 +4,17 @@ dist/
 *.log
 coverage/
 .DS_Store
+
+# IDE / editor state
+.vs/
+.idea/
+
+# Locally-uploaded media. Never commit these - and note they are NOT part of the
+# deploy artifact either, so they need their own volume + backup. See ADR 0008.
+uploads/
+
+# NOTE: .env.example is ignored here, which is unconventional - normally it is
+# tracked and holds placeholders only. It is ignored because the local copy
+# currently contains real SMTP credentials. Replace those with placeholders and
+# start tracking it again so new clones have a template to copy.
 .env.example
