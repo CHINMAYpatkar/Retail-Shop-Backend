@@ -1,15 +1,26 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { MediaAsset, Prisma, StorageDriverName } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { S3Service } from '../uploads/s3.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateMediaAssetDto } from './dto/create-media-asset.dto';
 import { QueryMediaDto } from './dto/query-media.dto';
 
+/**
+ * The media library.
+ *
+ * An asset is one of two things:
+ *  - an uploaded file, identified by `storageKey`, whose URL is resolved from
+ *    that key at read time; or
+ *  - an external link, which only ever has a `url`.
+ *
+ * Callers must not read `asset.url` straight off the row - go through
+ * `toResponse()`, which picks the right source. See ADR 0008.
+ */
 @Injectable()
 export class MediaService {
   constructor(
     private prisma: PrismaService,
-    private s3: S3Service,
+    private storage: StorageService,
   ) {}
 
   async findAll(query: QueryMediaDto) {
@@ -30,32 +41,74 @@ export class MediaService {
       this.prisma.mediaAsset.count({ where }),
     ]);
 
-    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return {
+      items: items.map((item) => this.toResponse(item)),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
-  /** Called after a successful presigned-URL upload to record the asset. */
-  create(dto: CreateMediaAssetDto, uploadedBy: string) {
-    return this.prisma.mediaAsset.create({
+  /** The raw row, for callers that need `storageKey` itself (e.g. private-document streaming). */
+  async findRecord(id: string): Promise<MediaAsset> {
+    const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
+    if (!asset) throw new NotFoundException('Media asset not found');
+    return asset;
+  }
+
+  /**
+   * Records an asset. Two shapes are supported:
+   *  - upload: `storageKey` present, `url` derived from it
+   *  - external link: `url` present, no `storageKey`
+   *
+   * `url` is still persisted for uploads as a convenience/debugging value, but
+   * it is never the source of truth - see `toResponse()`.
+   */
+  async create(dto: CreateMediaAssetDto, uploadedBy: string) {
+    const asset = await this.prisma.mediaAsset.create({
       data: {
         fileName: dto.fileName,
-        url: dto.url,
         type: dto.type,
         folder: dto.folder,
         sizeBytes: dto.sizeBytes,
+        mimeType: dto.mimeType,
+        storageKey: dto.storageKey,
+        // Only stamp a driver when we actually own the bytes.
+        driver: dto.storageKey ? this.currentDriver() : null,
+        url: dto.storageKey ? this.storage.publicUrl(dto.storageKey) : dto.url!,
         uploadedBy,
       },
     });
+
+    return this.toResponse(asset);
   }
 
   async remove(id: string) {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
     if (!asset) throw new NotFoundException('Media asset not found');
 
-    // Best-effort derive the S3 key from the stored URL so we can clean up storage too.
-    const key = asset.url.split('.amazonaws.com/')[1];
-    if (key) await this.s3.deleteObject(key);
+    // Only delete bytes we own. An external link has nothing to clean up, and
+    // an asset stored on a different driver than the one currently configured
+    // is left alone rather than being deleted from the wrong backend.
+    if (asset.storageKey && asset.driver === this.currentDriver()) {
+      await this.storage.delete(asset.storageKey);
+    }
 
     await this.prisma.mediaAsset.delete({ where: { id } });
     return { message: 'Media asset deleted' };
+  }
+
+  /** Resolves the URL from `storageKey` for uploads, falling back to the stored link. */
+  private toResponse(asset: MediaAsset) {
+    return {
+      ...asset,
+      url: asset.storageKey ? this.storage.publicUrl(asset.storageKey) : asset.url,
+      isUploaded: Boolean(asset.storageKey),
+    };
+  }
+
+  private currentDriver(): StorageDriverName {
+    return this.storage.driverName === 's3' ? StorageDriverName.S3 : StorageDriverName.LOCAL;
   }
 }
