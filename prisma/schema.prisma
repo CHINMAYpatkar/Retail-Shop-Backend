@@ -531,7 +531,13 @@ model ReviewImage {
   id       String @id @default(uuid())
   reviewId String
   review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  url      String
+
+  /// Key of the customer-uploaded image, same contract as MediaAsset (ADR 0008).
+  /// Nullable only for rows that predate uploads existing.
+  storageKey String?
+
+  /// Resolved at write time. Read through the service, which prefers storageKey.
+  url String
 
   @@map("review_images")
 }

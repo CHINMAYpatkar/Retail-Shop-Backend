@@ -34,7 +34,17 @@ export class CreateReviewDto {
   @MaxLength(2000)
   comment?: string;
 
-  @ApiPropertyOptional({ type: [String] })
+  /**
+   * Storage keys returned by `POST /customer/uploads/review-image` - NOT
+   * arbitrary URLs. Previously this accepted any string, which let a customer
+   * attach an image hosted anywhere (or point at a private key) and have it
+   * served from a public product page.
+   */
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'storageKey values from POST /customer/uploads/review-image',
+    example: ['public/reviews/2026/08/2f1c....webp'],
+  })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(6)

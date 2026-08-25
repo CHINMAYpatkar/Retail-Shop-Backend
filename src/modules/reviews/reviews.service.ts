@@ -1,13 +1,19 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { QueryReviewsDto } from './dto/query-reviews.dto';
 import { QueryReviewsAdminDto } from './dto/query-reviews-admin.dto';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private storage: StorageService,
+    private uploads: UploadsService,
+  ) {}
 
   async createForCustomer(customerId: string, dto: CreateReviewDto) {
     const product = await this.prisma.product.findUnique({ where: { id: dto.productId } });
@@ -24,13 +30,26 @@ export class ReviewsService {
     });
 
     const { images, ...rest } = dto;
+
+    // Keys must be ones we issued for review uploads. Without this check a
+    // payload of `images: ['private/bills/...']` would surface a private
+    // financial document on a public product page.
+    if (images?.length) this.uploads.assertReviewImageKeys(images);
+
     return this.prisma.review.create({
       data: {
         ...rest,
         customerId,
         isVerifiedPurchase: !!purchase,
         status: 'PENDING',
-        images: images ? { create: images.map((url) => ({ url })) } : undefined,
+        images: images
+          ? {
+              create: images.map((storageKey) => ({
+                storageKey,
+                url: this.storage.publicUrl(storageKey) ?? '',
+              })),
+            }
+          : undefined,
       },
       include: { images: true },
     });
