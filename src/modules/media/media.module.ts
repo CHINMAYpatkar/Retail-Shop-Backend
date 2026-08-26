@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
-import { UploadsModule } from '../uploads/uploads.module';
 
+// StorageModule is @Global, so no import needed for StorageService. The old
+// UploadsModule dependency existed only to reach S3Service for deletes.
 @Module({
-  imports: [UploadsModule],
   controllers: [MediaController],
   providers: [MediaService],
+  exports: [MediaService],
 })
 export class MediaModule {}

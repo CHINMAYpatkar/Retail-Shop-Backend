@@ -48,6 +48,9 @@ export default () => ({
     maxImageSizeMb: parseInt(process.env.MAX_IMAGE_SIZE_MB || '5', 10),
     maxVideoSizeMb: parseInt(process.env.MAX_VIDEO_SIZE_MB || '200', 10),
     maxDocumentSizeMb: parseInt(process.env.MAX_DOCUMENT_SIZE_MB || '10', 10),
+    // Escape hatch only - disabling this means EXIF (including GPS) is served
+    // back to the public verbatim. Never set 'false' in production.
+    processImages: process.env.PROCESS_IMAGES || 'true',
   },
 
   aws: {

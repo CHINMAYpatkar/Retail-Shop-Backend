@@ -1,0 +1,27 @@
+# Normalise every text file to LF in the repository AND in the working tree.
+#
+# Without this, `core.autocrlf=true` (set on this machine) converts files to
+# CRLF on checkout while Prettier defaults to `endOfLine: "lf"` - so every
+# checked-out file reports `Delete ␍` on every line. The repo ended up mixed:
+# 35 files CRLF, 141 LF.
+#
+# LF is the right canonical form here: this app is built and run in Linux
+# containers, where CRLF in a shell script or entrypoint is a runtime failure.
+# .gitattributes also travels with the repo, so it fixes every clone regardless
+# of each developer's local git config - which `core.autocrlf` does not.
+* text=auto eol=lf
+
+# Binary files must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.mp4 binary
+*.webm binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

@@ -72,6 +72,14 @@ enum MediaType {
   DOCUMENT
 }
 
+/// Which storage backend an asset actually lives on. Recorded per-asset so a
+/// migration to S3 can proceed gradually - resolving each asset's URL through
+/// its own driver - rather than needing a big-bang cutover. See ADR 0008.
+enum StorageDriverName {
+  LOCAL
+  S3
+}
+
 enum NotificationChannel {
   EMAIL
   SMS
@@ -90,26 +98,26 @@ enum OtpPurpose {
 // =========================================================
 
 model AdminUser {
-  id                String    @id @default(uuid())
-  name              String
-  email             String    @unique
-  passwordHash      String
-  isActive          Boolean   @default(true)
-  lastLoginAt       DateTime?
-  roleId            String
-  role              Role      @relation(fields: [roleId], references: [id])
-  refreshTokens     AdminRefreshToken[]
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id            String              @id @default(uuid())
+  name          String
+  email         String              @unique
+  passwordHash  String
+  isActive      Boolean             @default(true)
+  lastLoginAt   DateTime?
+  roleId        String
+  role          Role                @relation(fields: [roleId], references: [id])
+  refreshTokens AdminRefreshToken[]
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
-  activityLogs      ActivityLog[]
-  auditLogs         AuditLog[]
+  activityLogs ActivityLog[]
+  auditLogs    AuditLog[]
 
   @@map("admin_users")
 }
 
 model AdminRefreshToken {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   tokenHash   String
   adminUserId String
   adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
@@ -117,28 +125,28 @@ model AdminRefreshToken {
   ipAddress   String?
   expiresAt   DateTime
   revokedAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@map("admin_refresh_tokens")
 }
 
 model Role {
-  id          String       @id @default(uuid())
+  id          String           @id @default(uuid())
   name        AdminRoleName
   description String?
   permissions RolePermission[]
   adminUsers  AdminUser[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@unique([name])
   @@map("roles")
 }
 
 model Permission {
-  id          String   @id @default(uuid())
-  key         String   @unique // e.g. "products.create"
-  module      String   // e.g. "products"
+  id          String           @id @default(uuid())
+  key         String           @unique // e.g. "products.create"
+  module      String // e.g. "products"
   description String?
   roles       RolePermission[]
 
@@ -160,52 +168,52 @@ model RolePermission {
 // =========================================================
 
 model Customer {
-  id               String    @id @default(uuid())
-  name             String?
-  email            String    @unique
-  emailVerifiedAt  DateTime?
-  passwordHash     String?   // optional: OTP-first auth, password optional
-  isActive         Boolean   @default(true)
-  lastLoginAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String    @id @default(uuid())
+  name            String?
+  email           String    @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String? // optional: OTP-first auth, password optional
+  isActive        Boolean   @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  addresses        Address[]
-  wishlist         WishlistItem[]
-  cart             CartItem[]
-  orders           Order[]
-  reviews          Review[]
-  tickets          SupportTicket[]
-  otps             OtpCode[]
-  refreshTokens    CustomerRefreshToken[]
-  sessions         CustomerSession[]
+  addresses     Address[]
+  wishlist      WishlistItem[]
+  cart          CartItem[]
+  orders        Order[]
+  reviews       Review[]
+  tickets       SupportTicket[]
+  otps          OtpCode[]
+  refreshTokens CustomerRefreshToken[]
+  sessions      CustomerSession[]
 
   @@map("customers")
 }
 
 model CustomerRefreshToken {
-  id          String   @id @default(uuid())
-  tokenHash   String
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  userAgent   String?
-  ipAddress   String?
-  expiresAt   DateTime
-  revokedAt   DateTime?
-  createdAt   DateTime @default(now())
+  id         String    @id @default(uuid())
+  tokenHash  String
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  userAgent  String?
+  ipAddress  String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
 
   @@map("customer_refresh_tokens")
 }
 
 model CustomerSession {
-  id          String   @id @default(uuid())
-  customerId  String
-  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  deviceId    String?
-  userAgent   String?
-  ipAddress   String?
-  lastSeenAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  deviceId   String?
+  userAgent  String?
+  ipAddress  String?
+  lastSeenAt DateTime @default(now())
+  createdAt  DateTime @default(now())
 
   @@map("customer_sessions")
 }
@@ -228,23 +236,23 @@ model OtpCode {
 }
 
 model Address {
-  id           String   @id @default(uuid())
-  customerId   String
-  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  label        String? // Home, Work, etc.
-  fullName     String
-  phone        String
-  line1        String
-  line2        String?
-  city         String
-  state        String
-  postalCode   String
-  country      String   @default("India")
-  isDefault    Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  label      String? // Home, Work, etc.
+  fullName   String
+  phone      String
+  line1      String
+  line2      String?
+  city       String
+  state      String
+  postalCode String
+  country    String   @default("India")
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  orders       Order[]
+  orders Order[]
 
   @@map("addresses")
 }
@@ -254,22 +262,22 @@ model Address {
 // =========================================================
 
 model Category {
-  id          String     @id @default(uuid())
-  name        String
-  slug        String     @unique
-  description String?
-  imageUrl    String?
-  iconUrl     String?
-  metaTitle   String?
+  id              String     @id @default(uuid())
+  name            String
+  slug            String     @unique
+  description     String?
+  imageUrl        String?
+  iconUrl         String?
+  metaTitle       String?
   metaDescription String?
-  isActive    Boolean    @default(true)
-  sortOrder   Int        @default(0)
-  parentId    String?
-  parent      Category?  @relation("CategoryToParent", fields: [parentId], references: [id])
-  children    Category[] @relation("CategoryToParent")
-  products    Product[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  isActive        Boolean    @default(true)
+  sortOrder       Int        @default(0)
+  parentId        String?
+  parent          Category?  @relation("CategoryToParent", fields: [parentId], references: [id])
+  children        Category[] @relation("CategoryToParent")
+  products        Product[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   @@map("categories")
 }
@@ -285,47 +293,47 @@ model Ingredient {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  products    ProductIngredient[]
-  recipes     RecipeIngredient[]
+  products ProductIngredient[]
+  recipes  RecipeIngredient[]
 
   @@map("ingredients")
 }
 
 model Product {
-  id                 String    @id @default(uuid())
-  name               String
-  slug               String    @unique
-  shortDescription   String?
-  description        String?
-  price              Decimal   @db.Decimal(10, 2)
-  compareAtPrice     Decimal?  @db.Decimal(10, 2)
-  weightGrams        Int?
-  shelfLifeDays      Int?
+  id                  String    @id @default(uuid())
+  name                String
+  slug                String    @unique
+  shortDescription    String?
+  description         String?
+  price               Decimal   @db.Decimal(10, 2)
+  compareAtPrice      Decimal?  @db.Decimal(10, 2)
+  weightGrams         Int?
+  shelfLifeDays       Int?
   storageInstructions String?
-  preparationProcess String?   @db.Text
-  stockQuantity      Int       @default(0)
-  sku                String?   @unique
-  isActive           Boolean   @default(true)
-  isFeatured         Boolean   @default(false)
-  deletedAt          DateTime? // soft delete
-  metaTitle          String?
-  metaDescription    String?
+  preparationProcess  String?   @db.Text
+  stockQuantity       Int       @default(0)
+  sku                 String?   @unique
+  isActive            Boolean   @default(true)
+  isFeatured          Boolean   @default(false)
+  deletedAt           DateTime? // soft delete
+  metaTitle           String?
+  metaDescription     String?
 
   // A deleted product may be retained for order history after its category is removed.
-  categoryId         String?
-  category           Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  categoryId String?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  images             ProductImage[]
-  variants           ProductVariant[]
-  ingredients        ProductIngredient[]
-  recipes            RecipeProduct[]
-  reviews            Review[]
-  wishlistedBy       WishlistItem[]
-  cartItems          CartItem[]
-  orderItems         OrderItem[]
+  images       ProductImage[]
+  variants     ProductVariant[]
+  ingredients  ProductIngredient[]
+  recipes      RecipeProduct[]
+  reviews      Review[]
+  wishlistedBy WishlistItem[]
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
 
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("products")
 }
@@ -346,7 +354,7 @@ model ProductVariant {
   id            String   @id @default(uuid())
   productId     String
   product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  name          String   // e.g. "250g", "500g"
+  name          String // e.g. "250g", "500g"
   sku           String?  @unique
   priceOverride Decimal? @db.Decimal(10, 2)
   stockQuantity Int      @default(0)
@@ -366,21 +374,21 @@ model ProductIngredient {
 }
 
 model Recipe {
-  id               String   @id @default(uuid())
-  name             String
-  slug             String   @unique
-  description      String?
-  steps            Json     // ordered array of { title, description, imageUrl? }
-  cookingTimeMins  Int?
-  difficulty       String?  // Easy / Medium / Hard
-  videoUrl         String?
-  imageUrl         String?
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  description     String?
+  steps           Json // ordered array of { title, description, imageUrl? }
+  cookingTimeMins Int?
+  difficulty      String? // Easy / Medium / Hard
+  videoUrl        String?
+  imageUrl        String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  ingredients      RecipeIngredient[]
-  products         RecipeProduct[]
+  ingredients RecipeIngredient[]
+  products    RecipeProduct[]
 
   @@map("recipes")
 }
@@ -443,28 +451,28 @@ model CartItem {
 // =========================================================
 
 model Order {
-  id              String        @id @default(uuid())
-  orderNumber     String        @unique
-  customerId      String
-  customer        Customer      @relation(fields: [customerId], references: [id])
-  addressId       String
-  address         Address       @relation(fields: [addressId], references: [id])
-  status          OrderStatus   @default(PLACED)
-  paymentMethod   PaymentMethod @default(COD)
-  paymentStatus   PaymentStatus @default(PENDING)
-  subtotal        Decimal       @db.Decimal(10, 2)
-  taxAmount       Decimal       @db.Decimal(10, 2) @default(0)
-  shippingAmount  Decimal       @db.Decimal(10, 2) @default(0)
-  discountAmount  Decimal       @db.Decimal(10, 2) @default(0)
-  totalAmount     Decimal       @db.Decimal(10, 2)
-  invoiceUrl      String?
-  cancelledAt     DateTime?
-  cancelReason    String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String        @id @default(uuid())
+  orderNumber    String        @unique
+  customerId     String
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  addressId      String
+  address        Address       @relation(fields: [addressId], references: [id])
+  status         OrderStatus   @default(PLACED)
+  paymentMethod  PaymentMethod @default(COD)
+  paymentStatus  PaymentStatus @default(PENDING)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxAmount      Decimal       @default(0) @db.Decimal(10, 2)
+  shippingAmount Decimal       @default(0) @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(10, 2)
+  totalAmount    Decimal       @db.Decimal(10, 2)
+  invoiceUrl     String?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  items           OrderItem[]
-  statusHistory   OrderStatusHistory[]
+  items         OrderItem[]
+  statusHistory OrderStatusHistory[]
 
   @@map("orders")
 }
@@ -476,7 +484,7 @@ model OrderItem {
   productId   String
   product     Product @relation(fields: [productId], references: [id])
   variantId   String?
-  productName String  // snapshot at time of order
+  productName String // snapshot at time of order
   unitPrice   Decimal @db.Decimal(10, 2)
   quantity    Int
   totalPrice  Decimal @db.Decimal(10, 2)
@@ -490,7 +498,7 @@ model OrderStatusHistory {
   order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   status    OrderStatus
   note      String?
-  changedBy String?     // admin user id or "system"
+  changedBy String? // admin user id or "system"
   createdAt DateTime    @default(now())
 
   @@map("order_status_history")
@@ -501,20 +509,20 @@ model OrderStatusHistory {
 // =========================================================
 
 model Review {
-  id               String       @id @default(uuid())
-  productId        String
-  customerId       String
-  product          Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  customer         Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  rating           Int
-  title            String?
-  comment          String?
-  isVerifiedPurchase Boolean    @default(false)
-  status           ReviewStatus @default(PENDING)
-  adminReply       String?
-  images           ReviewImage[]
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                 String        @id @default(uuid())
+  productId          String
+  customerId         String
+  product            Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  customer           Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rating             Int
+  title              String?
+  comment            String?
+  isVerifiedPurchase Boolean       @default(false)
+  status             ReviewStatus  @default(PENDING)
+  adminReply         String?
+  images             ReviewImage[]
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   @@map("reviews")
 }
@@ -523,7 +531,13 @@ model ReviewImage {
   id       String @id @default(uuid())
   reviewId String
   review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  url      String
+
+  /// Key of the customer-uploaded image, same contract as MediaAsset (ADR 0008).
+  /// Nullable only for rows that predate uploads existing.
+  storageKey String?
+
+  /// Resolved at write time. Read through the service, which prefers storageKey.
+  url String
 
   @@map("review_images")
 }
@@ -533,19 +547,26 @@ model ReviewImage {
 // =========================================================
 
 model Banner {
-  id          String          @id @default(uuid())
-  title       String
-  subtitle    String?
-  imageUrl    String
-  ctaLabel    String?
-  ctaUrl      String?
-  placement   BannerPlacement
-  sortOrder   Int             @default(0)
-  isActive    Boolean         @default(true)
-  startsAt    DateTime?
-  endsAt      DateTime?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id        String          @id @default(uuid())
+  title     String
+  subtitle  String?
+
+  /// Still required: a banner must have an image, which doubles as the poster
+  /// frame when a video is present and as the whole banner when it isn't.
+  imageUrl  String
+
+  /// Optional promo/advertisement video. Rendered over imageUrl when set, so a
+  /// storefront that can't play it still has something to show.
+  videoUrl  String?
+  ctaLabel  String?
+  ctaUrl    String?
+  placement BannerPlacement
+  sortOrder Int             @default(0)
+  isActive  Boolean         @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
   @@map("banners")
 }
@@ -565,42 +586,60 @@ model CmsPage {
 }
 
 model Blog {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   title           String
-  slug            String   @unique
+  slug            String    @unique
   excerpt         String?
-  content         String   @db.Text
+  content         String    @db.Text
   coverImageUrl   String?
   metaTitle       String?
   metaDescription String?
-  isPublished     Boolean  @default(false)
+  isPublished     Boolean   @default(false)
   publishedAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   @@map("blogs")
 }
 
 model FaqItem {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   question  String
-  answer    String   @db.Text
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
+  answer    String  @db.Text
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
 
   @@map("faq_items")
 }
 
 model MediaAsset {
   id         String    @id @default(uuid())
-  fileName   String
-  url        String
+  fileName   String // original client-supplied name, for display only
   type       MediaType
   folder     String?
   sizeBytes  Int?
   uploadedBy String?
   createdAt  DateTime  @default(now())
 
+  /// Driver-relative key, e.g. `products/2026/08/<uuid>.webp`.
+  ///
+  /// This - not `url` - is the durable identity of an uploaded file. Public
+  /// URLs are resolved from it at read time, so changing storage backend never
+  /// requires rewriting rows or breaking URLs already in the wild (ADR 0008).
+  ///
+  /// Null for assets added by external URL, which this project supports
+  /// alongside uploads.
+  storageKey String?            @unique
+  driver     StorageDriverName?
+  mimeType   String?
+
+  /// Only meaningful for externally-linked assets. For uploaded assets the URL
+  /// is derived from `storageKey`; do not read this column directly - go
+  /// through MediaService, which resolves the right one.
+  url String
+
+  @@index([type, folder])
+  @@index([createdAt])
   @@map("media_assets")
 }
 
@@ -609,17 +648,17 @@ model MediaAsset {
 // =========================================================
 
 model SupportTicket {
-  id          String        @id @default(uuid())
-  ticketNumber String       @unique
-  customerId  String?
-  customer    Customer?     @relation(fields: [customerId], references: [id])
-  name        String
-  email       String
-  subject     String
-  status      TicketStatus  @default(OPEN)
-  messages    TicketMessage[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id           String          @id @default(uuid())
+  ticketNumber String          @unique
+  customerId   String?
+  customer     Customer?       @relation(fields: [customerId], references: [id])
+  name         String
+  email        String
+  subject      String
+  status       TicketStatus    @default(OPEN)
+  messages     TicketMessage[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@map("support_tickets")
 }
@@ -628,7 +667,7 @@ model TicketMessage {
   id         String        @id @default(uuid())
   ticketId   String
   ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  senderType String        // "customer" | "admin"
+  senderType String // "customer" | "admin"
   senderName String?
   message    String        @db.Text
   createdAt  DateTime      @default(now())
@@ -641,15 +680,15 @@ model TicketMessage {
 // =========================================================
 
 model Notification {
-  id         String              @id @default(uuid())
-  channel    NotificationChannel
-  recipient  String
-  subject    String?
-  body       String              @db.Text
-  isSent     Boolean             @default(false)
-  sentAt     DateTime?
-  error      String?
-  createdAt  DateTime            @default(now())
+  id        String              @id @default(uuid())
+  channel   NotificationChannel
+  recipient String
+  subject   String?
+  body      String              @db.Text
+  isSent    Boolean             @default(false)
+  sentAt    DateTime?
+  error     String?
+  createdAt DateTime            @default(now())
 
   @@map("notifications")
 }
@@ -681,7 +720,7 @@ model AuditLog {
   adminUser   AdminUser? @relation(fields: [adminUserId], references: [id])
   entityType  String
   entityId    String
-  action      String     // CREATE, UPDATE, DELETE
+  action      String // CREATE, UPDATE, DELETE
   before      Json?
   after       Json?
   createdAt   DateTime   @default(now())

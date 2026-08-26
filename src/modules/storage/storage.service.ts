@@ -44,7 +44,10 @@ export class StorageService implements OnModuleInit {
 
     const root = this.localDisk.getRoot();
     try {
-      await fs.mkdir(root, { recursive: true });
+      // Create both subtrees up front so the static mount has a real directory
+      // to point at on a cold start.
+      await fs.mkdir(this.localDisk.getPublicRoot(), { recursive: true });
+      await fs.mkdir(root + '/private', { recursive: true });
       await fs.access(root);
       this.logger.log(`Storage driver "local" ready - uploads root: ${root}`);
     } catch (error) {
@@ -64,10 +67,13 @@ export class StorageService implements OnModuleInit {
   }
 
   /**
-   * Resolves a stored key to a public URL. Always prefer this over a persisted
-   * URL column so a driver change doesn't require rewriting rows.
+   * Resolves a stored key to a public URL, or null for private assets (bill
+   * and receipt scans), which are streamed through a guarded route instead.
+   *
+   * Always prefer this over a persisted URL column so a driver change doesn't
+   * require rewriting rows.
    */
-  publicUrl(storageKey: string): string {
+  publicUrl(storageKey: string): string | null {
     return this.driver.publicUrl(storageKey);
   }
 

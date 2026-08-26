@@ -3,13 +3,24 @@ import { ConfigService } from '@nestjs/config';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-import { categoryForMimeType, extensionForMimeType, UPLOAD_FOLDERS } from './storage.constants';
+import {
+  categoryForMimeType,
+  extensionForMimeType,
+  isPrivateFolder,
+  UPLOAD_FOLDERS,
+} from './storage.constants';
 import { StorageDriver, StorageDriverName, StoredObject, UploadFile } from './storage.types';
 
 /**
  * Writes uploads to the local filesystem under `UPLOAD_DIR`.
  *
- * Layout: <root>/<folder>/<YYYY>/<MM>/<uuid>.<ext>
+ * Layout: <root>/<public|private>/<folder>/<YYYY>/<MM>/<uuid>.<ext>
+ *
+ * The public/private split is deliberate and load-bearing: static serving is
+ * mounted on <root>/public only, so a private asset (bill and receipt scans -
+ * business financial records) cannot be reached by URL even if the guarded
+ * route that streams them is misconfigured or removed. Making the leak
+ * structurally impossible beats relying on middleware ordering.
  *
  * Year/month sharding keeps directory listings manageable and makes
  * date-scoped archival or cleanup straightforward later.
@@ -44,7 +55,8 @@ export class LocalDiskDriver implements StorageDriver {
     // map - never from the client-supplied name, which is the standard
     // path-traversal and silent-overwrite vector.
     const fileName = `${uuidv4()}.${extensionForMimeType(file.mimeType)}`;
-    const storageKey = `${safeFolder}/${year}/${month}/${fileName}`;
+    const visibility = isPrivateFolder(safeFolder) ? 'private' : 'public';
+    const storageKey = `${visibility}/${safeFolder}/${year}/${month}/${fileName}`;
     const absolutePath = this.assertInsideRoot(storageKey);
 
     try {
@@ -87,8 +99,20 @@ export class LocalDiskDriver implements StorageDriver {
     }
   }
 
-  publicUrl(storageKey: string): string {
-    return `${this.publicBaseUrl}${this.publicPathPrefix}/${storageKey}`;
+  /**
+   * Private assets deliberately have no public URL - they are streamed through
+   * a guarded controller instead. Returning a URL that 404s would be worse
+   * than being explicit about it.
+   */
+  publicUrl(storageKey: string): string | null {
+    if (!this.isPublicKey(storageKey)) return null;
+    // Strip the `public/` segment: it is a filesystem detail, not part of the URL.
+    const relative = storageKey.slice('public/'.length);
+    return `${this.publicBaseUrl}${this.publicPathPrefix}/${relative}`;
+  }
+
+  isPublicKey(storageKey: string): boolean {
+    return storageKey.startsWith('public/');
   }
 
   localPath(storageKey: string): string | null {
@@ -99,9 +123,19 @@ export class LocalDiskDriver implements StorageDriver {
     }
   }
 
-  /** The uploads root, for wiring static serving in main.ts. */
+  /** The uploads root - the parent of both the public and private subtrees. */
   getRoot(): string {
     return this.root;
+  }
+
+  /** The ONLY directory that may be served statically. See the class comment. */
+  getPublicRoot(): string {
+    return path.join(this.root, 'public');
+  }
+
+  /** URL path that `getPublicRoot()` is mounted on. */
+  getPublicPathPrefix(): string {
+    return this.publicPathPrefix;
   }
 
   private assertAllowedFolder(folder: string): string {

@@ -11,7 +11,12 @@ coverage/
 
 # Locally-uploaded media. Never commit these - and note they are NOT part of the
 # deploy artifact either, so they need their own volume + backup. See ADR 0008.
-uploads/
+#
+# LEADING SLASH IS REQUIRED. `uploads/` (unanchored) matches a directory of
+# that name at ANY depth, which silently excluded the entire
+# `src/modules/uploads/` source directory - new files there were skipped by
+# `git add` without any warning.
+/uploads/
 
 # NOTE: .env.example is ignored here, which is unconventional - normally it is
 # tracked and holds placeholders only. It is ignored because the local copy
