@@ -56,7 +56,9 @@ export class ImageProcessorService {
       // A file that passed magic-byte detection but cannot be decoded is
       // either corrupt or crafted. Storing the original would defeat the
       // point of re-encoding, so it is rejected by the caller.
-      this.logger.warn(`Image processing failed for ${file.originalName}: ${(error as Error).message}`);
+      this.logger.warn(
+        `Image processing failed for ${file.originalName}: ${(error as Error).message}`,
+      );
       throw error;
     }
   }

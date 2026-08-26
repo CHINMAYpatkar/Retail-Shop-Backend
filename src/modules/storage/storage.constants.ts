@@ -7,16 +7,17 @@
  */
 export type MediaCategory = 'image' | 'video' | 'document';
 
-export const ALLOWED_MIME_TYPES: Readonly<Record<string, { ext: string; category: MediaCategory }>> =
-  {
-    'image/jpeg': { ext: 'jpg', category: 'image' },
-    'image/png': { ext: 'png', category: 'image' },
-    'image/webp': { ext: 'webp', category: 'image' },
-    'image/avif': { ext: 'avif', category: 'image' },
-    'video/mp4': { ext: 'mp4', category: 'video' },
-    'video/webm': { ext: 'webm', category: 'video' },
-    'application/pdf': { ext: 'pdf', category: 'document' },
-  };
+export const ALLOWED_MIME_TYPES: Readonly<
+  Record<string, { ext: string; category: MediaCategory }>
+> = {
+  'image/jpeg': { ext: 'jpg', category: 'image' },
+  'image/png': { ext: 'png', category: 'image' },
+  'image/webp': { ext: 'webp', category: 'image' },
+  'image/avif': { ext: 'avif', category: 'image' },
+  'video/mp4': { ext: 'mp4', category: 'video' },
+  'video/webm': { ext: 'webm', category: 'video' },
+  'application/pdf': { ext: 'pdf', category: 'document' },
+};
 
 export function isAllowedMimeType(mimeType: string): boolean {
   return Object.prototype.hasOwnProperty.call(ALLOWED_MIME_TYPES, mimeType);

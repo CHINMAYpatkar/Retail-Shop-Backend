@@ -123,7 +123,9 @@ export class UploadsService {
     // Detect before storing so a non-image is rejected without ever hitting disk.
     const detected = detectAllowedMimeType(multerFile?.buffer ?? Buffer.alloc(0));
     if (!detected || categoryForMimeType(detected) !== 'image') {
-      throw new BadRequestException('Only images (JPEG, PNG, WebP, AVIF) may be attached to a review');
+      throw new BadRequestException(
+        'Only images (JPEG, PNG, WebP, AVIF) may be attached to a review',
+      );
     }
 
     return this.handleUpload(multerFile, 'reviews');

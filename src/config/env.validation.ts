@@ -1,5 +1,12 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsIn, IsNotEmpty, IsNumberString, IsOptional, validateSync } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsNotEmpty,
+  IsNumberString,
+  IsOptional,
+  validateSync,
+} from 'class-validator';
 
 enum NodeEnv {
   Development = 'development',

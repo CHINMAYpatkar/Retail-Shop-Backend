@@ -65,10 +65,7 @@ export class UploadsController {
       limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
     }),
   )
-  async upload(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() dto: UploadFileDto,
-  ) {
+  async upload(@UploadedFile() file: Express.Multer.File, @Body() dto: UploadFileDto) {
     if (!file) throw new BadRequestException('No file was uploaded (expected field "file")');
     return this.uploads.handleUpload(file, dto.folder || 'misc');
   }

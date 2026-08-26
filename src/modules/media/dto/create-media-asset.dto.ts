@@ -24,8 +24,7 @@ export class CreateMediaAssetDto {
   storageKey?: string;
 
   @ApiPropertyOptional({
-    description:
-      'External URL. Only for assets hosted elsewhere - omit when supplying storageKey.',
+    description: 'External URL. Only for assets hosted elsewhere - omit when supplying storageKey.',
   })
   @ValidateIf((dto: CreateMediaAssetDto) => !dto.storageKey)
   @IsString()

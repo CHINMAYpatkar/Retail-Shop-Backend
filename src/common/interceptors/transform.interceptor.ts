@@ -15,7 +15,10 @@ export interface Response<T> {
 
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<T, Response<T> | StreamableFile> {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<Response<T> | StreamableFile> {
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<Response<T> | StreamableFile> {
     return next.handle().pipe(
       map((data) => {
         // A StreamableFile must be returned untouched so Nest can pipe it to
