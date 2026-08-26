@@ -550,7 +550,14 @@ model Banner {
   id        String          @id @default(uuid())
   title     String
   subtitle  String?
+
+  /// Still required: a banner must have an image, which doubles as the poster
+  /// frame when a video is present and as the whole banner when it isn't.
   imageUrl  String
+
+  /// Optional promo/advertisement video. Rendered over imageUrl when set, so a
+  /// storefront that can't play it still has something to show.
+  videoUrl  String?
   ctaLabel  String?
   ctaUrl    String?
   placement BannerPlacement

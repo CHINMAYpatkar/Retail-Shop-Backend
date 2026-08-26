@@ -12,9 +12,14 @@ export class CreateBannerDto {
   @IsString()
   subtitle?: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: 'Required. Doubles as the poster frame when videoUrl is set.' })
   @IsString()
   imageUrl: string;
+
+  @ApiPropertyOptional({ description: 'Optional promo/advertisement video.' })
+  @IsOptional()
+  @IsString()
+  videoUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
