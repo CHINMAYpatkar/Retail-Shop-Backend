@@ -1,5 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -24,10 +29,24 @@ export class ReviewsService {
     });
     if (existing) throw new BadRequestException('You have already reviewed this product');
 
-    // Verified purchase: the customer has a delivered order containing this product.
+    // Reviews are only permitted on a product the customer has actually
+    // received. Previously this lookup only *labelled* the review as verified
+    // and let anyone review anything - so a customer could rate a product they
+    // had never bought.
+    //
+    // Rejecting outright (rather than accepting and hiding) means the storefront
+    // can tell the customer honestly why the form is unavailable, instead of
+    // taking a review that silently never appears.
     const purchase = await this.prisma.orderItem.findFirst({
-      where: { productId: dto.productId, order: { customerId, status: 'DELIVERED' } },
+      where: { productId: dto.productId, order: { customerId, status: OrderStatus.DELIVERED } },
+      select: { id: true },
     });
+
+    if (!purchase) {
+      throw new ForbiddenException(
+        'You can only review a product from an order that has been delivered',
+      );
+    }
 
     const { images, ...rest } = dto;
 
@@ -40,7 +59,10 @@ export class ReviewsService {
       data: {
         ...rest,
         customerId,
-        isVerifiedPurchase: !!purchase,
+        // Always true now that an unverified review cannot be created. Kept as a
+        // column because it stays meaningful for rows written before this rule,
+        // and because a future "reviews from gifts/samples" flow would need it.
+        isVerifiedPurchase: true,
         status: 'PENDING',
         images: images
           ? {
