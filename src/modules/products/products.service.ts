@@ -110,10 +110,13 @@ export class ProductsService {
   // ---------- Admin ----------
 
   async findAllAdmin(query: QueryProductsAdminDto) {
-    const { page = 1, limit = 20, search, categoryId, isActive, includeDeleted } = query;
+    const { page = 1, limit = 20, search, categoryId, isActive, includeDeleted, onlyDeleted } = query;
 
     const where: Prisma.ProductWhereInput = {
-      ...(includeDeleted ? {} : { deletedAt: null }),
+      // Three states, not two: the trash view needs ONLY deleted rows, so that
+      // restoring something removes it from that view. `includeDeleted` mixes
+      // both, which made a restored product appear to still be deleted.
+      ...(onlyDeleted ? { deletedAt: { not: null } } : includeDeleted ? {} : { deletedAt: null }),
       ...(categoryId ? { categoryId } : {}),
       ...(isActive !== undefined ? { isActive } : {}),
       ...(search
