@@ -110,7 +110,15 @@ export class ProductsService {
   // ---------- Admin ----------
 
   async findAllAdmin(query: QueryProductsAdminDto) {
-    const { page = 1, limit = 20, search, categoryId, isActive, includeDeleted, onlyDeleted } = query;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      categoryId,
+      isActive,
+      includeDeleted,
+      onlyDeleted,
+    } = query;
 
     const where: Prisma.ProductWhereInput = {
       // Three states, not two: the trash view needs ONLY deleted rows, so that
