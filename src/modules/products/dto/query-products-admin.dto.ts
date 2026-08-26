@@ -15,9 +15,18 @@ export class QueryProductsAdminDto extends PaginationQueryDto {
   @IsBoolean()
   isActive?: boolean;
 
-  @ApiPropertyOptional({ description: 'Include soft-deleted products' })
+  @ApiPropertyOptional({ description: 'Include soft-deleted products alongside live ones' })
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()
   includeDeleted?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Return ONLY soft-deleted products - the trash view. Takes precedence over includeDeleted.',
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  onlyDeleted?: boolean;
 }

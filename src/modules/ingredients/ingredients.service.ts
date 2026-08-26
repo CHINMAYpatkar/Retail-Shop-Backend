@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { slugify } from '../../common/utils/slugify';
 import { CreateIngredientDto } from './dto/create-ingredient.dto';
@@ -54,8 +54,37 @@ export class IngredientsService {
     return this.prisma.ingredient.update({ where: { id }, data });
   }
 
+  /**
+   * Refuses to delete an ingredient that is still in use.
+   *
+   * `ProductIngredient` and `RecipeIngredient` both cascade on delete, so
+   * without this guard removing an ingredient would silently strip it from
+   * every product and recipe referencing it. Ingredients are hard-deleted
+   * (only Product is soft-deleted, see ADR 0002), so there is no undo -
+   * prevention is the only protection available.
+   */
   async remove(id: string) {
     await this.findOneAdmin(id);
+
+    const [productCount, recipeCount] = await this.prisma.$transaction([
+      this.prisma.productIngredient.count({ where: { ingredientId: id } }),
+      this.prisma.recipeIngredient.count({ where: { ingredientId: id } }),
+    ]);
+
+    if (productCount > 0 || recipeCount > 0) {
+      const used = [
+        productCount > 0 ? `${productCount} product(s)` : null,
+        recipeCount > 0 ? `${recipeCount} recipe(s)` : null,
+      ]
+        .filter(Boolean)
+        .join(' and ');
+
+      throw new ConflictException(
+        `Cannot delete this ingredient because it is used by ${used}. ` +
+          `Remove it from those first, or mark the ingredient inactive to hide it from the storefront.`,
+      );
+    }
+
     await this.prisma.ingredient.delete({ where: { id } });
     return { message: 'Ingredient deleted' };
   }
