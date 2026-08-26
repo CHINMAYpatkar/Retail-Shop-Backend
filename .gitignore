@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+.env.test
 *.log
 coverage/
 .DS_Store
@@ -14,9 +15,11 @@ coverage/
 #
 # LEADING SLASH IS REQUIRED. `uploads/` (unanchored) matches a directory of
 # that name at ANY depth, which silently excluded the entire
-# `src/modules/uploads/` source directory - new files there were skipped by
+# `src/modules/uploads/
+/uploads-test/` source directory - new files there were skipped by
 # `git add` without any warning.
 /uploads/
+/uploads-test/
 
 # NOTE: .env.example is ignored here, which is unconventional - normally it is
 # tracked and holds placeholders only. It is ignored because the local copy

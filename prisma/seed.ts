@@ -26,6 +26,8 @@ const MODULES = [
   // supplier pricing and product margins are not STAFF or MANAGER information.
   'vendors',
   'raw-materials',
+  'purchase-bills',
+  'vendor-payments',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete'];
 

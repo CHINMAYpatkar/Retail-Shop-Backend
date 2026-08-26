@@ -38,6 +38,7 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module';
+import { PurchaseBillsModule } from './modules/purchase-bills/purchase-bills.module';
 
 @Module({
   imports: [
@@ -85,6 +86,7 @@ import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module
     // Back office (procurement). SUPER_ADMIN/ADMIN only.
     VendorsModule,
     RawMaterialsModule,
+    PurchaseBillsModule,
     // Phase 1 + Phase 2 complete. All modules from the spec are now implemented.
   ],
   providers: [
