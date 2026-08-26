@@ -87,6 +87,18 @@ enum NotificationChannel {
   WHATSAPP
 }
 
+/// Base unit a raw material is measured in. Deliberately ONE per material with
+/// no conversion: buying a 5kg sack of a GRAM-based material is entered as
+/// quantity 5000. That removes a whole class of rounding and conversion bugs.
+enum MeasurementUnit {
+  GRAM
+  KILOGRAM
+  MILLILITRE
+  LITRE
+  PIECE
+  PACKET
+}
+
 enum OtpPurpose {
   REGISTER
   LOGIN
@@ -295,6 +307,10 @@ model Ingredient {
 
   products ProductIngredient[]
   recipes  RecipeIngredient[]
+
+  /// Operational stock items mapping to this storefront ingredient. Optional on
+  /// both sides - see ADR 0011 for why these are separate models.
+  rawMaterials RawMaterial[]
 
   @@map("ingredients")
 }
@@ -547,13 +563,13 @@ model ReviewImage {
 // =========================================================
 
 model Banner {
-  id        String          @id @default(uuid())
-  title     String
-  subtitle  String?
+  id       String  @id @default(uuid())
+  title    String
+  subtitle String?
 
   /// Still required: a banner must have an image, which doubles as the poster
   /// frame when a video is present and as the whole banner when it isn't.
-  imageUrl  String
+  imageUrl String
 
   /// Optional promo/advertisement video. Rendered over imageUrl when set, so a
   /// storefront that can't play it still has something to show.
@@ -691,6 +707,75 @@ model Notification {
   createdAt DateTime            @default(now())
 
   @@map("notifications")
+}
+
+// =========================================================
+// PROCUREMENT (back office)
+// =========================================================
+
+/// A supplier of raw materials.
+///
+/// Outstanding balance is deliberately NOT stored - it is computed from bills
+/// minus payments, because a stored balance drifts the first time anything is
+/// edited or deleted.
+model Vendor {
+  id            String  @id @default(uuid())
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  addressLine1  String?
+  addressLine2  String?
+  city          String?
+  state         String?
+  postalCode    String?
+  gstin         String? // tax registration id, informational only (ADR 0013)
+  notes         String?
+  isActive      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@map("vendors")
+}
+
+/// An operational inventory item - what is actually bought, stocked and consumed.
+///
+/// NOT the same thing as `Ingredient`, which is storefront content (name, story,
+/// image). One ingredient can map to several raw materials (different grades or
+/// pack sizes), and many raw materials have no ingredient at all: jars, labels,
+/// pouches, cartons. Keeping them apart also keeps cost data off a model that
+/// public routes read. See ADR 0011.
+model RawMaterial {
+  id       String          @id @default(uuid())
+  name     String
+  code     String?         @unique
+  baseUnit MeasurementUnit
+
+  /// Fractional quantities are normal (2.5 kg), hence Decimal rather than Int.
+  stockQuantity Decimal  @default(0) @db.Decimal(12, 3)
+  reorderLevel  Decimal? @db.Decimal(12, 3)
+
+  /// Moving average, maintained when a purchase bill is recorded. 4dp because a
+  /// per-gram cost is genuinely sub-paisa and rounding it compounds over a batch.
+  avgCostPerUnit    Decimal? @db.Decimal(12, 4)
+  lastPurchasePrice Decimal? @db.Decimal(12, 4)
+
+  /// SetNull, not Cascade: removing the storefront ingredient must never delete
+  /// the stock record or its cost history.
+  ingredientId String?
+  ingredient   Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  isActive Boolean @default(true)
+  notes    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([ingredientId])
+  @@map("raw_materials")
 }
 
 model Setting {

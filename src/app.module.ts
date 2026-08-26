@@ -36,6 +36,8 @@ import { MediaModule } from './modules/media/media.module';
 import { SupportModule } from './modules/support/support.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { VendorsModule } from './modules/vendors/vendors.module';
+import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module';
 
 @Module({
   imports: [
@@ -79,6 +81,10 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     SupportModule,
     SettingsModule,
     DashboardModule,
+
+    // Back office (procurement). SUPER_ADMIN/ADMIN only.
+    VendorsModule,
+    RawMaterialsModule,
     // Phase 1 + Phase 2 complete. All modules from the spec are now implemented.
   ],
   providers: [

@@ -22,6 +22,10 @@ const MODULES = [
   'users', // admin users
   'roles',
   'dashboard',
+  // Back-office / procurement. Restricted to SUPER_ADMIN and ADMIN below:
+  // supplier pricing and product margins are not STAFF or MANAGER information.
+  'vendors',
+  'raw-materials',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete'];
 
