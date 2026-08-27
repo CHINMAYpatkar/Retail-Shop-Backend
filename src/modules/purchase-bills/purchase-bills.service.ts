@@ -93,6 +93,11 @@ export class PurchaseBillsService {
     await this.assertBillNumberAvailable(dto.vendorId, dto.billNumber);
     await this.assertMaterialsExist(dto.items);
 
+    this.assertDueDateNotBeforeBillDate(
+      new Date(dto.billDate),
+      dto.dueDate ? new Date(dto.dueDate) : null,
+    );
+
     const lines = this.buildLines(dto.items);
     const { subtotal, totalAmount } = billTotals(
       lines,
@@ -149,6 +154,13 @@ export class PurchaseBillsService {
     if (dto.billNumber && dto.billNumber !== existing.billNumber) {
       await this.assertBillNumberAvailable(dto.vendorId ?? existing.vendorId, dto.billNumber, id);
     }
+
+    // The effective pair, not just what was sent: changing only the bill date
+    // can invalidate a due date that was fine before, and vice versa.
+    this.assertDueDateNotBeforeBillDate(
+      dto.billDate ? new Date(dto.billDate) : existing.billDate,
+      dto.dueDate === undefined ? existing.dueDate : dto.dueDate ? new Date(dto.dueDate) : null,
+    );
 
     const replacingItems = dto.items !== undefined;
     if (replacingItems) await this.assertMaterialsExist(dto.items!);
@@ -345,6 +357,30 @@ export class PurchaseBillsService {
     if (existing) {
       throw new ConflictException(
         `Bill number "${billNumber}" has already been recorded for this vendor`,
+      );
+    }
+  }
+
+  /**
+   * A bill cannot fall due before it was issued.
+   *
+   * Same-day is allowed - payable on receipt is normal. Only strictly earlier
+   * is rejected, and it is rejected here rather than only in the UI, because
+   * the date pair is the kind of thing an import or a direct API call would
+   * otherwise sail straight past.
+   */
+  private assertDueDateNotBeforeBillDate(billDate: Date, dueDate: Date | null) {
+    if (!dueDate) return;
+
+    // Compared by calendar day: both arrive as midnight UTC from a date input,
+    // but a timestamp difference within the same day is not a real conflict.
+    const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+
+    if (day(dueDate) < day(billDate)) {
+      throw new BadRequestException(
+        `Due date (${dueDate.toISOString().slice(0, 10)}) cannot be earlier than the bill date (${billDate
+          .toISOString()
+          .slice(0, 10)})`,
       );
     }
   }
