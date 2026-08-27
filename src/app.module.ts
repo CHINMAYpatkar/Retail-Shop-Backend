@@ -39,6 +39,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { VendorsModule } from './modules/vendors/vendors.module';
 import { RawMaterialsModule } from './modules/raw-materials/raw-materials.module';
 import { PurchaseBillsModule } from './modules/purchase-bills/purchase-bills.module';
+import { VendorPaymentsModule } from './modules/vendor-payments/vendor-payments.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { PurchaseBillsModule } from './modules/purchase-bills/purchase-bills.mod
     VendorsModule,
     RawMaterialsModule,
     PurchaseBillsModule,
+    VendorPaymentsModule,
     // Phase 1 + Phase 2 complete. All modules from the spec are now implemented.
   ],
   providers: [
