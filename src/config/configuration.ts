@@ -34,7 +34,8 @@ export default () => ({
     secure: process.env.SMTP_SECURE === 'true',
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
-    from: process.env.SMTP_FROM || 'Retail Shop <no-reply@retailshop.com>',
+    // from: process.env.SMTP_FROM || 'Retail Shop <no-reply@retailshop.com>',
+    from: 'Retail Shop',
   },
 
   storage: {
