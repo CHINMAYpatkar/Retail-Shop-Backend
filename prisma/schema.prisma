@@ -366,6 +366,7 @@ model Product {
   wishlistedBy WishlistItem[]
   cartItems    CartItem[]
   orderItems   OrderItem[]
+  costSheets   ProductCostSheet[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -523,6 +524,15 @@ model OrderItem {
   unitPrice   Decimal @db.Decimal(10, 2)
   quantity    Int
   totalPrice  Decimal @db.Decimal(10, 2)
+
+  /// What this unit cost US, snapshotted from the product's active cost sheet
+  /// at checkout - exactly as `unitPrice` snapshots what the customer paid.
+  ///
+  /// Stored rather than looked up so COGS is exact and permanently immutable:
+  /// no as-of-date joins against versioned cost sheets at report time, and a
+  /// later cost-sheet revision can never rewrite the margin on a past sale.
+  /// Null for orders placed before cost sheets existed.
+  unitCostPrice Decimal? @db.Decimal(12, 4)
 
   @@map("order_items")
 }
@@ -800,7 +810,8 @@ model RawMaterial {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  purchaseItems PurchaseBillItem[]
+  purchaseItems  PurchaseBillItem[]
+  costSheetItems ProductCostSheetItem[]
 
   @@index([isActive])
   @@index([ingredientId])
@@ -904,6 +915,78 @@ model VendorPayment {
   @@index([purchaseBillId])
   @@index([paidOn])
   @@map("vendor_payments")
+}
+
+/// What it costs to make a product: raw materials plus the making costs.
+///
+/// Versioned rather than edited in place. Changing a cost structure creates a
+/// new version and deactivates the previous one, so a historical margin stays
+/// answerable ("what did this cost us in August?") instead of being silently
+/// rewritten by today's prices.
+model ProductCostSheet {
+  id        String  @id @default(uuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  version       Int
+  effectiveFrom DateTime @default(now())
+
+  /// Exactly one active sheet per product. Creating a new version deactivates
+  /// whatever was active before.
+  isActive Boolean @default(true)
+
+  /// How many sellable units one run of this sheet produces. Cost per unit is
+  /// the batch total divided by this, so it must be at least 1.
+  batchYieldQuantity Int
+
+  /// Computed from the line items - never accepted from the client.
+  materialCost Decimal @default(0) @db.Decimal(12, 2)
+
+  /// The "making cost" side, entered by hand.
+  labourCost    Decimal @default(0) @db.Decimal(12, 2)
+  packagingCost Decimal @default(0) @db.Decimal(12, 2)
+  overheadCost  Decimal @default(0) @db.Decimal(12, 2)
+  otherCost     Decimal @default(0) @db.Decimal(12, 2)
+
+  /// Both computed: total = materials + making costs, per-unit = total / yield.
+  totalBatchCost Decimal @default(0) @db.Decimal(12, 2)
+  costPerUnit    Decimal @default(0) @db.Decimal(12, 4)
+
+  notes            String?
+  createdByAdminId String?
+
+  items ProductCostSheetItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, version])
+  @@index([productId, isActive])
+  @@map("product_cost_sheets")
+}
+
+model ProductCostSheetItem {
+  id          String           @id @default(uuid())
+  costSheetId String
+  costSheet   ProductCostSheet @relation(fields: [costSheetId], references: [id], onDelete: Cascade)
+
+  rawMaterialId String
+  rawMaterial   RawMaterial @relation(fields: [rawMaterialId], references: [id])
+
+  /// In the material's own base unit - no conversion, as everywhere else.
+  quantity Decimal @db.Decimal(12, 3)
+
+  /// SNAPSHOTTED, defaulted from the material's average cost when the sheet is
+  /// created. Read live instead and every historical margin would shift each
+  /// time a material price moved.
+  ratePerUnit Decimal @db.Decimal(12, 4)
+  lineCost    Decimal @db.Decimal(12, 2)
+
+  notes String?
+
+  @@index([costSheetId])
+  @@index([rawMaterialId])
+  @@map("product_cost_sheet_items")
 }
 
 model Setting {

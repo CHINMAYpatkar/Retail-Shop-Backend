@@ -28,6 +28,7 @@ const MODULES = [
   'raw-materials',
   'purchase-bills',
   'vendor-payments',
+  'costing',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete'];
 

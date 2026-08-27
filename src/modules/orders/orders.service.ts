@@ -94,6 +94,19 @@ export class OrdersService {
             });
           }
 
+          // What this unit costs US, frozen here alongside what the customer
+          // paid. Stored rather than looked up later so COGS is exact and
+          // immutable: a future cost-sheet revision can never rewrite the margin
+          // on a sale that already happened, and reports need no as-of-date join.
+          //
+          // Null when the product has no active cost sheet - the margin is then
+          // genuinely unknown for this sale, which is better recorded as unknown
+          // than guessed at from today's costs.
+          const activeCostSheet = await tx.productCostSheet.findFirst({
+            where: { productId: item.productId, isActive: true },
+            select: { costPerUnit: true },
+          });
+
           const totalPrice = unitPrice * item.quantity;
           subtotal += totalPrice;
           orderItemsData.push({
@@ -103,6 +116,7 @@ export class OrdersService {
             unitPrice,
             quantity: item.quantity,
             totalPrice,
+            unitCostPrice: activeCostSheet?.costPerUnit ?? null,
           });
         }
 
