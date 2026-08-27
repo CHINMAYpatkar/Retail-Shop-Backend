@@ -29,6 +29,9 @@ const MODULES = [
   'purchase-bills',
   'vendor-payments',
   'costing',
+  'expenses',
+  'refunds',
+  'reports',
 ];
 const ACTIONS = ['view', 'create', 'update', 'delete'];
 

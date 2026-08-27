@@ -43,6 +43,11 @@ enum PaymentStatus {
   PENDING
   PAID
   FAILED
+
+  /// Partial refunds are the common case - one damaged jar out of four. Without
+  /// this value a partial refund could only be recorded as a lie in one
+  /// direction or the other.
+  PARTIALLY_REFUNDED
   REFUNDED
 }
 
@@ -116,6 +121,27 @@ enum PaymentMode {
   CHEQUE
   CARD
   OTHER
+}
+
+enum ExpenseCategory {
+  RENT
+  UTILITIES
+  SALARY
+  PACKAGING
+  TRANSPORT
+  MARKETING
+  EQUIPMENT
+  MAINTENANCE
+  MISC
+}
+
+/// Three states rather than a boolean, because "we agreed to refund" and "the
+/// money has actually left the account" are often different days - and the gap
+/// between them is a real liability worth seeing.
+enum RefundStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }
 
 enum OtpPurpose {
@@ -509,6 +535,7 @@ model Order {
 
   items         OrderItem[]
   statusHistory OrderStatusHistory[]
+  refunds       Refund[]
 
   @@map("orders")
 }
@@ -687,6 +714,7 @@ model MediaAsset {
   /// never deletes the financial record that referenced it.
   purchaseBills  PurchaseBill[]
   vendorPayments VendorPayment[]
+  expenses       Expense[]
 
   @@index([type, folder])
   @@index([createdAt])
@@ -772,6 +800,7 @@ model Vendor {
 
   bills    PurchaseBill[]
   payments VendorPayment[]
+  expenses Expense[]
 
   @@index([isActive])
   @@map("vendors")
@@ -987,6 +1016,77 @@ model ProductCostSheetItem {
   @@index([costSheetId])
   @@index([rawMaterialId])
   @@map("product_cost_sheet_items")
+}
+
+/// Money spent running the business - everything that is not raw material.
+///
+/// Deliberately distinct from a refund: an expense is a cost of operating, a
+/// refund reverses a sale. Filing refunds as expenses would leave net revenue
+/// looking healthy while profit quietly was not, which is exactly the reporting
+/// failure this domain exists to prevent.
+model Expense {
+  id       String          @id @default(uuid())
+  category ExpenseCategory
+  title    String
+  amount   Decimal         @db.Decimal(12, 2)
+  spentOn  DateTime
+  method   PaymentMode
+
+  /// Optional - only when the money went to a vendor we already track.
+  vendorId String?
+  vendor   Vendor? @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+
+  attachmentMediaId String?
+  attachment        MediaAsset? @relation(fields: [attachmentMediaId], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  /// Plain id rather than a relation on purpose: the audit trail must survive
+  /// the admin account being deleted.
+  createdByAdminId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([spentOn])
+  @@index([category])
+  @@index([vendorId])
+  @@map("expenses")
+}
+
+/// A refund the business has agreed to, or already paid, on an order.
+///
+/// A RECORD of what a human did, not a workflow: there is no payment gateway,
+/// so refunds are sent by hand over UPI or bank transfer and this captures the
+/// fact. See ADR 0012.
+model Refund {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount Decimal      @db.Decimal(10, 2)
+  reason String
+  method PaymentMode
+  status RefundStatus @default(PENDING)
+
+  /// UPI transaction id, bank reference - the audit trail for money leaving.
+  referenceNo String?
+
+  /// Set when the status becomes COMPLETED, i.e. when the money actually went.
+  refundedOn DateTime?
+
+  notes String?
+
+  /// Who processed it. Not optional in spirit - money movement must be
+  /// attributable - and a plain id so it survives the admin being deleted.
+  processedByAdminId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@map("refunds")
 }
 
 model Setting {
