@@ -94,4 +94,52 @@ export class AdminAuthService {
 
     return { message: 'Password changed successfully' };
   }
+
+  /**
+   * The signed-in admin's own profile, including the permission keys their role
+   * grants.
+   *
+   * Deliberately here rather than reusing `GET /admin/users/:id` + `GET
+   * /admin/roles`: both of those are gated to SUPER_ADMIN/ADMIN at the ROLE
+   * level, so a MANAGER or STAFF account could not read its own profile and
+   * therefore could not complete login at all.
+   *
+   * Knowing who you are is not user management, so this endpoint carries no
+   * role or permission gate beyond being authenticated. It also stops the
+   * client having to pull every role with every permission just to find its
+   * own - which leaked the whole permission matrix to any admin who logged in.
+   */
+  async getProfile(adminId: string) {
+    const admin = await this.prisma.adminUser.findUnique({
+      where: { id: adminId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        isActive: true,
+        lastLoginAt: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            permissions: { select: { permission: { select: { key: true } } } },
+          },
+        },
+      },
+    });
+
+    if (!admin) throw new UnauthorizedException('Admin account not found');
+    if (!admin.isActive) throw new UnauthorizedException('This account has been deactivated');
+
+    return {
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      lastLoginAt: admin.lastLoginAt,
+      role: { id: admin.role.id, name: admin.role.name, description: admin.role.description },
+      // Flat list of keys - the only shape the client actually needs.
+      permissions: admin.role.permissions.map((rp) => rp.permission.key),
+    };
+  }
 }

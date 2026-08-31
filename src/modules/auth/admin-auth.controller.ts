@@ -1,5 +1,5 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { AdminAuthService } from './admin-auth.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
@@ -47,6 +47,24 @@ export class AdminAuthController {
   @HttpCode(HttpStatus.OK)
   resetPassword(@Body() dto: AdminResetPasswordDto) {
     return this.authService.resetPassword(dto);
+  }
+
+  /**
+   * The signed-in admin's own profile and permission keys.
+   *
+   * Only JwtAdminAuthGuard - no role or permission gate. Every admin must be
+   * able to read their own identity to complete login, regardless of role.
+   */
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "The signed-in admin's own profile",
+    description:
+      'Returns the admin plus the flat list of permission keys their role grants. Available to any authenticated admin.',
+  })
+  @UseGuards(JwtAdminAuthGuard)
+  me(@CurrentUser('id') adminId: string) {
+    return this.authService.getProfile(adminId);
   }
 
   @Post('change-password')

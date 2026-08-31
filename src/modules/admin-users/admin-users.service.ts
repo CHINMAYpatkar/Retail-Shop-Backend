@@ -27,6 +27,7 @@ export class AdminUsersService {
 
   async findOne(id: string) {
     const user = await this.prisma.adminUser.findUnique({ where: { id }, select: SAFE_SELECT });
+    console.log('findOne user:', user);
     if (!user) throw new NotFoundException('Admin user not found');
     return user;
   }
