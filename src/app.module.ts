@@ -43,6 +43,7 @@ import { VendorPaymentsModule } from './modules/vendor-payments/vendor-payments.
 import { CostingModule } from './modules/costing/costing.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { RefundsModule } from './modules/refunds/refunds.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 @Module({
   imports: [
@@ -95,6 +96,7 @@ import { RefundsModule } from './modules/refunds/refunds.module';
     CostingModule,
     ExpensesModule,
     RefundsModule,
+    ReportsModule,
     // Phase 1 + Phase 2 complete. All modules from the spec are now implemented.
   ],
   providers: [
