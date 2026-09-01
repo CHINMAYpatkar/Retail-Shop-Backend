@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { OrderStatus, Prisma, RefundStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+
+const ZERO = new Prisma.Decimal(0);
 
 @Injectable()
 export class DashboardService {
@@ -9,7 +12,10 @@ export class DashboardService {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const [
-      revenueAgg,
+      deliveredAgg,
+      bookedAgg,
+      refundsAgg,
+      pendingRefundsAgg,
       ordersByStatus,
       totalCustomers,
       totalProducts,
@@ -20,10 +26,32 @@ export class DashboardService {
       pendingReviewCount,
       openTicketCount,
     ] = await this.prisma.$transaction([
+      // Money actually collected: payment is taken on delivery, so only a
+      // DELIVERED order represents revenue. This deliberately matches the
+      // reports P&L - the two figures previously disagreed, and two different
+      // revenue numbers on two screens undermines trust in both.
       this.prisma.order.aggregate({
-        where: { createdAt: { gte: thirtyDaysAgo }, status: { notIn: ['CANCELLED'] } },
+        where: { createdAt: { gte: thirtyDaysAgo }, status: OrderStatus.DELIVERED },
         _sum: { totalAmount: true },
         _count: true,
+      }),
+      // Everything not cancelled, delivered or not. This is the pipeline, and
+      // it is what the old "revenue" figure was actually measuring - kept, but
+      // labelled honestly rather than passed off as revenue.
+      this.prisma.order.aggregate({
+        where: { createdAt: { gte: thirtyDaysAgo }, status: { notIn: [OrderStatus.CANCELLED] } },
+        _sum: { totalAmount: true },
+        _count: true,
+      }),
+      // Only COMPLETED refunds reduce revenue; money merely agreed has not left.
+      this.prisma.refund.aggregate({
+        where: { createdAt: { gte: thirtyDaysAgo }, status: RefundStatus.COMPLETED },
+        _sum: { amount: true },
+      }),
+      // Reported separately as a liability, never netted off revenue.
+      this.prisma.refund.aggregate({
+        where: { status: RefundStatus.PENDING },
+        _sum: { amount: true },
       }),
       this.prisma.order.groupBy({
         by: ['status'],
@@ -65,9 +93,24 @@ export class DashboardService {
       this.prisma.supportTicket.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
     ]);
 
+    const grossRevenue = deliveredAgg._sum.totalAmount ?? ZERO;
+    const refunds = refundsAgg._sum.amount ?? ZERO;
+
     return {
-      revenueLast30Days: revenueAgg._sum.totalAmount || 0,
-      ordersLast30Days: revenueAgg._count,
+      /**
+       * Net revenue over the window: delivered order value less completed
+       * refunds. Same definition as `/admin/reports/profit-loss`.
+       */
+      revenueLast30Days: grossRevenue.sub(refunds).toDecimalPlaces(2),
+      grossRevenueLast30Days: grossRevenue.toDecimalPlaces(2),
+      refundsLast30Days: refunds.toDecimalPlaces(2),
+      /** Delivered orders only - the count behind the revenue figure. */
+      deliveredOrdersLast30Days: deliveredAgg._count,
+      /** All non-cancelled orders: the pipeline, not money in hand. */
+      bookedLast30Days: (bookedAgg._sum.totalAmount ?? ZERO).toDecimalPlaces(2),
+      ordersLast30Days: bookedAgg._count,
+      /** Agreed but not yet sent - a liability, not deducted above. */
+      pendingRefundAmount: (pendingRefundsAgg._sum.amount ?? ZERO).toDecimalPlaces(2),
       ordersByStatus: Object.fromEntries(ordersByStatus.map((o) => [o.status, o._count])),
       totalCustomers,
       totalProducts,
