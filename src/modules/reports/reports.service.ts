@@ -73,12 +73,28 @@ export class ReportsService {
 
     const [refundsCompleted, refundsPending, expenseAgg, expensesByCategory] =
       await this.prisma.$transaction([
+        // Scoped to the SAME orders that produced `revenue` above - delivered,
+        // and placed inside the period - not to when the refund was recorded.
+        //
+        // Filtering by `refund.createdAt` instead looks equivalent and is not:
+        // a refund entered today against a 60-day-old order would be netted off
+        // this period's revenue, which that order never contributed to. In a
+        // slow month that reports negative revenue for a shop that traded
+        // profitably. Cash actually refunded in a period is a different
+        // question, answered by the refunds list rather than by the P&L.
         this.prisma.refund.aggregate({
-          where: { status: RefundStatus.COMPLETED, ...(createdAt ? { createdAt } : {}) },
+          where: {
+            status: RefundStatus.COMPLETED,
+            order: { status: OrderStatus.DELIVERED, ...(createdAt ? { createdAt } : {}) },
+          },
           _sum: { amount: true },
         }),
+        // Point-in-time, deliberately NOT scoped to the period: money owed but
+        // not yet sent is a balance, not a flow, and the dashboard reports the
+        // same figure the same way. Two screens disagreeing on this once cost a
+        // day of debugging.
         this.prisma.refund.aggregate({
-          where: { status: RefundStatus.PENDING, ...(createdAt ? { createdAt } : {}) },
+          where: { status: RefundStatus.PENDING },
           _sum: { amount: true },
         }),
         this.prisma.expense.aggregate({

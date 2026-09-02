@@ -1,9 +1,34 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
-// Keys considered safe to expose without authentication (storefront needs these
-// to render footer/contact/SEO defaults). Everything else stays admin-only.
-const PUBLIC_KEYS = ['business_info', 'social_links', 'seo_defaults', 'invoice_settings'];
+/**
+ * Keys served without authentication.
+ *
+ * This list is a disclosure boundary, not a convenience: anything named here is
+ * readable by anyone on the internet. Adding a key is a deliberate act, and
+ * `cms.e2e-spec.ts` pins the exact set so it cannot grow by accident.
+ *
+ * The storefront is required to carry no static content, so its entire chrome -
+ * logo, announcement bar, USP strip, home section headings and footer - is
+ * admin-managed and has to be readable here (SF-30, SF-31).
+ *
+ * `invoice_settings` was removed. It holds `{ invoicePrefix, gstNumber,
+ * footerNote }`, nothing on the storefront reads it, and the admin settings
+ * page reaches it through the authenticated `admin/settings` route instead.
+ * A GSTIN is not secret, but `footerNote` is free text on an invoice - the
+ * natural place for someone to paste bank details - and there was no reason for
+ * any of it to be world-readable.
+ */
+const PUBLIC_KEYS = [
+  'business_info',
+  'social_links',
+  'seo_defaults',
+  'branding',
+  'announcement',
+  'usp_strip',
+  'home_sections',
+  'footer',
+];
 
 @Injectable()
 export class SettingsService {

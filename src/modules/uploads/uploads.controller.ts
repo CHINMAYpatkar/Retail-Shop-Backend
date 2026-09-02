@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Body,
   Controller,
   Post,
@@ -13,7 +14,11 @@ import { AdminRoleName } from '@prisma/client';
 import { memoryStorage } from 'multer';
 import { JwtAdminAuthGuard } from '../../common/guards/jwt-admin-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { isPrivateFolder } from '../storage/storage.constants';
 import { UploadFileDto } from './dto/upload-file.dto';
 import { UploadsService } from './uploads.service';
 
@@ -35,13 +40,16 @@ const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 @ApiTags('Uploads (Admin)')
 @ApiBearerAuth()
-@UseGuards(JwtAdminAuthGuard, RolesGuard)
-@Roles(AdminRoleName.SUPER_ADMIN, AdminRoleName.ADMIN, AdminRoleName.MANAGER, AdminRoleName.STAFF)
+@UseGuards(JwtAdminAuthGuard, RolesGuard, PermissionsGuard)
+// STAFF is absent deliberately: uploading writes bytes to disk, and STAFF's
+// entire grant is orders.view and support.view.
+@Roles(AdminRoleName.SUPER_ADMIN, AdminRoleName.ADMIN, AdminRoleName.MANAGER)
 @Controller('admin/uploads')
 export class UploadsController {
   constructor(private uploads: UploadsService) {}
 
   @Post()
+  @RequirePermissions('media.create')
   @ApiOperation({
     summary: 'Upload a file',
     description:
@@ -65,8 +73,31 @@ export class UploadsController {
       limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
     }),
   )
-  async upload(@UploadedFile() file: Express.Multer.File, @Body() dto: UploadFileDto) {
+  async upload(
+    @UploadedFile() file: Express.Multer.File,
+    @Body() dto: UploadFileDto,
+    @CurrentUser() user: { roleName: string; permissions: string[] },
+  ) {
     if (!file) throw new BadRequestException('No file was uploaded (expected field "file")');
-    return this.uploads.handleUpload(file, dto.folder || 'misc');
+
+    const folder = dto.folder || 'misc';
+
+    // Private folders hold bill and receipt scans. Writing there is part of
+    // the purchase-bills workflow, and only back-office roles can read them
+    // back - so letting anyone else write would create files nobody who put
+    // them there could ever retrieve.
+    if (isPrivateFolder(folder) && !this.canWritePrivate(user)) {
+      throw new ForbiddenException('You do not have permission to upload to this folder');
+    }
+
+    return this.uploads.handleUpload(file, folder);
+  }
+
+  /** SUPER_ADMIN bypasses granular checks, matching PermissionsGuard. */
+  private canWritePrivate(user: { roleName: string; permissions: string[] }): boolean {
+    return (
+      user?.roleName === AdminRoleName.SUPER_ADMIN ||
+      (user?.permissions || []).includes('purchase-bills.create')
+    );
   }
 }

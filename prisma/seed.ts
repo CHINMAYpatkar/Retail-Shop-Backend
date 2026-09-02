@@ -84,17 +84,25 @@ async function main() {
       description: 'Operations manager (orders, products, customers)',
     },
   });
-  const managerPerms = allPermissions.filter((p) =>
-    [
-      'products',
-      'categories',
-      'ingredients',
-      'recipes',
-      'orders',
-      'customers',
-      'reviews',
-      'dashboard',
-    ].includes(p.module),
+  // Whole modules MANAGER owns outright.
+  const managerModules = [
+    'products',
+    'categories',
+    'ingredients',
+    'recipes',
+    'orders',
+    'customers',
+    'reviews',
+    'dashboard',
+  ];
+  // Individual keys rather than the whole module. MANAGER edits the catalogue,
+  // so browsing and adding media is part of the job - but deleting a media
+  // asset is not, because MediaAsset is also the attachment target for purchase
+  // bills, vendor payments and expenses, and the delete removes the bytes.
+  const managerExtraKeys = ['media.view', 'media.create', 'media.update'];
+
+  const managerPerms = allPermissions.filter(
+    (p) => managerModules.includes(p.module) || managerExtraKeys.includes(p.key),
   );
   await prisma.rolePermission.deleteMany({ where: { roleId: managerRole.id } });
   await prisma.rolePermission.createMany({

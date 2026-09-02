@@ -19,6 +19,23 @@ const REFUNDABLE_STATUSES: OrderStatus[] = [
   OrderStatus.CANCELLED,
 ];
 
+/**
+ * Refunds that count against an order's refundable balance.
+ *
+ * FAILED is excluded because a failed refund moved no money: the customer is
+ * still owed it. Counting it would permanently consume the balance and leave
+ * the admin unable to record the retry - and since refunds have no delete by
+ * design, the only escape would be editing the failed row, destroying the
+ * record of the failed attempt that the no-delete rule exists to preserve.
+ *
+ * PENDING IS included: it is money committed but not yet sent, and allowing
+ * more pending refunds than the order is worth is how an order ends up
+ * over-refunded the moment they are all marked complete.
+ */
+const COMMITTED_REFUND = {
+  status: { in: [RefundStatus.PENDING, RefundStatus.COMPLETED] },
+} satisfies Prisma.RefundWhereInput;
+
 const REFUND_INCLUDE = {
   order: {
     select: {
@@ -108,7 +125,12 @@ export class RefundsService {
   async create(orderId: string, dto: CreateRefundDto, adminId?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      select: { id: true, status: true, totalAmount: true, refunds: { select: { amount: true } } },
+      select: {
+        id: true,
+        status: true,
+        totalAmount: true,
+        refunds: { where: COMMITTED_REFUND, select: { amount: true } },
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
 
@@ -169,7 +191,10 @@ export class RefundsService {
           totalAmount: true,
           // This refund is excluded, so re-saving an unchanged amount cannot
           // fail against its own value.
-          refunds: { where: { id: { not: id } }, select: { amount: true } },
+          refunds: {
+            where: { ...COMMITTED_REFUND, id: { not: id } },
+            select: { amount: true },
+          },
         },
       });
       if (!order) throw new NotFoundException('Order not found');
@@ -213,6 +238,7 @@ export class RefundsService {
     otherRefunds: { amount: Prisma.Decimal }[],
     amount: Prisma.Decimal,
   ) {
+    // `otherRefunds` is already filtered to COMMITTED_REFUND by both callers.
     const alreadyRefunded = otherRefunds.reduce((acc, r) => acc.add(r.amount), ZERO);
     const remaining = orderTotal.sub(alreadyRefunded);
 

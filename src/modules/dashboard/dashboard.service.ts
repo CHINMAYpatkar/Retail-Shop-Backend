@@ -44,8 +44,17 @@ export class DashboardService {
         _count: true,
       }),
       // Only COMPLETED refunds reduce revenue; money merely agreed has not left.
+      //
+      // Scoped to the same orders that produced the revenue above - delivered,
+      // and placed inside the window - rather than to when the refund row was
+      // created. A refund entered today against a 60-day-old order belongs to
+      // that order's period, not this one; netting it here would show negative
+      // revenue for a month that actually traded. Matches reports P&L exactly.
       this.prisma.refund.aggregate({
-        where: { createdAt: { gte: thirtyDaysAgo }, status: RefundStatus.COMPLETED },
+        where: {
+          status: RefundStatus.COMPLETED,
+          order: { status: OrderStatus.DELIVERED, createdAt: { gte: thirtyDaysAgo } },
+        },
         _sum: { amount: true },
       }),
       // Reported separately as a liability, never netted off revenue.
