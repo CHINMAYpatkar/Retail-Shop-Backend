@@ -74,28 +74,69 @@ export async function plantOtp(
   });
 }
 
-/** Creates a verified customer and logs them in through the real endpoint. */
+/** Pulls a cookie value out of a supertest response's Set-Cookie header. */
+export function cookieFrom(res: request.Response, name: string): string | null {
+  const raw = res.headers['set-cookie'];
+  const all = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const match = all.find((cookie) => cookie.startsWith(`${name}=`));
+  if (!match) return null;
+  return match.split(';')[0].slice(name.length + 1);
+}
+
+export const REFRESH_COOKIE = 'rs_customer_refresh';
+
+/**
+ * Creates a verified customer and signs them in through the real endpoint.
+ *
+ * The refresh token is no longer in the response body - it is set as an
+ * httpOnly cookie - so it is read back off `Set-Cookie` here, which is also the
+ * only way a browser would ever get at it.
+ */
 export async function customerToken(
   app: INestApplication,
   prisma: PrismaService,
   prefix: string,
   suffix = '',
-): Promise<{ token: string; refreshToken: string; customer: SeededCustomer }> {
+): Promise<{
+  token: string;
+  refreshCookie: string | null;
+  customer: SeededCustomer;
+  body: Record<string, unknown>;
+}> {
   const customer = await createVerifiedCustomer(prisma, suffix);
   await plantOtp(prisma, customer.email, OtpPurpose.LOGIN, E2E_OTP, customer.id);
 
   const res = await request(app.getHttpServer())
-    .post(`/${prefix}/auth/customer/login/verify`)
+    .post(`/${prefix}/auth/customer/otp/verify`)
     .send({ email: customer.email, code: E2E_OTP });
 
   const token = res.body?.data?.accessToken;
   if (!token) {
     throw new Error(
-      `Customer login failed for ${customer.email}: ${res.status} ${JSON.stringify(res.body)}`,
+      `Customer sign-in failed for ${customer.email}: ${res.status} ${JSON.stringify(res.body)}`,
     );
   }
 
-  return { token, refreshToken: res.body.data.refreshToken, customer };
+  return {
+    token,
+    refreshCookie: cookieFrom(res, REFRESH_COOKIE),
+    customer,
+    body: res.body.data,
+  };
+}
+
+/** A brand-new, unverified email with a REGISTER code waiting - the sign-up branch. */
+export async function newCustomerOtp(
+  prisma: PrismaService,
+  suffix = '',
+): Promise<{ email: string }> {
+  const email = `${E2E_TAG}newcustomer${suffix}@example.test`;
+
+  await prisma.customer.deleteMany({ where: { email } });
+  const customer = await prisma.customer.create({ data: { email } });
+  await plantOtp(prisma, email, OtpPurpose.REGISTER, E2E_OTP, customer.id);
+
+  return { email };
 }
 
 /** Removes only the rows these fixtures create. */

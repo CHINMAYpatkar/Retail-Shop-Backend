@@ -225,9 +225,18 @@ model RolePermission {
 // =========================================================
 
 model Customer {
-  id              String    @id @default(uuid())
-  name            String?
-  email           String    @unique
+  id    String  @id @default(uuid())
+  name  String?
+  email String  @unique
+
+  /// The customer's own contact number, distinct from the phone on each
+  /// address. Payment is cash on delivery, so this is the number the shop
+  /// actually rings about an order - an address may be a relative's or a
+  /// workplace, with a different person to call for that delivery.
+  ///
+  /// Nullable because an account exists from the moment its email is verified,
+  /// before the registration details are filled in.
+  phone           String?
   emailVerifiedAt DateTime?
   passwordHash    String? // optional: OTP-first auth, password optional
   isActive        Boolean   @default(true)
