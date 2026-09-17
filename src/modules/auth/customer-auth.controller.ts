@@ -1,5 +1,7 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JwtCustomerAuthGuard } from '../../common/guards/jwt-customer-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Request } from 'express';
 import { CustomerAuthService } from './customer-auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -49,5 +51,24 @@ export class CustomerAuthController {
   @HttpCode(HttpStatus.OK)
   logout(@Body() dto: RefreshTokenDto) {
     return this.authService.logout(dto.refreshToken);
+  }
+
+  /**
+   * The signed-in customer's own profile.
+   *
+   * `JwtCustomerAuthGuard` and nothing else. Reading your own identity is
+   * unprivileged by definition, and gating it any further is precisely how the
+   * admin side once locked every non-ADMIN role out of the product.
+   */
+  @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "The signed-in customer's own profile",
+    description:
+      'Identity only: id, name, email, whether the address is verified. Available to any authenticated customer.',
+  })
+  @UseGuards(JwtCustomerAuthGuard)
+  me(@CurrentUser('id') customerId: string) {
+    return this.authService.getProfile(customerId);
   }
 }

@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { OtpPurpose } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../notifications/mail.service';
@@ -102,5 +107,55 @@ export class CustomerAuthService {
   async logout(refreshToken: string): Promise<{ message: string }> {
     await this.tokens.revokeCustomerRefreshToken(refreshToken);
     return { message: 'Logged out successfully' };
+  }
+
+  /**
+   * The signed-in customer's own profile.
+   *
+   * Reading your own identity is unprivileged by definition - a valid customer
+   * token is the whole authorisation. This exists because without it the
+   * storefront can complete an OTP login, hold a valid token, and still not
+   * know who it is signed in as: no name for the header, nothing to prefill at
+   * checkout, no account page.
+   *
+   * That is the same failure the admin side hit, where every non-ADMIN role
+   * could authenticate but not load its own profile, and was locked out of the
+   * product entirely. See ADR 0001 and the RBAC lockout write-up.
+   *
+   * `emailVerifiedAt` is collapsed to a boolean: the storefront only ever needs
+   * to know whether the address is confirmed, and the timestamp is not its
+   * business. `passwordHash` is never selected - auth here is OTP-first and the
+   * column is usually null anyway, but selecting it at all is how it ends up in
+   * a response by accident later.
+   */
+  async getProfile(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        emailVerifiedAt: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    // A token can outlive the account it names - deleted between issue and use,
+    // or deactivated. 401 rather than 404: the request is authenticated but the
+    // credential is no longer good, and the client should re-authenticate
+    // rather than treat it as a missing page.
+    if (!customer) throw new UnauthorizedException('Account not found');
+    if (!customer.isActive) throw new UnauthorizedException('This account has been deactivated');
+
+    return {
+      id: customer.id,
+      name: customer.name,
+      email: customer.email,
+      isVerified: customer.emailVerifiedAt !== null,
+      lastLoginAt: customer.lastLoginAt,
+      createdAt: customer.createdAt,
+    };
   }
 }
