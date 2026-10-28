@@ -20,9 +20,3 @@ coverage/
 # `git add` without any warning.
 /uploads/
 /uploads-test/
-
-# NOTE: .env.example is ignored here, which is unconventional - normally it is
-# tracked and holds placeholders only. It is ignored because the local copy
-# currently contains real SMTP credentials. Replace those with placeholders and
-# start tracking it again so new clones have a template to copy.
-.env.example

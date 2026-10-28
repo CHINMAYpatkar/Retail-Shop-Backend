@@ -33,13 +33,23 @@ export class BannersService {
     return banner;
   }
 
+  /**
+   * The `as any` these two used to carry was simply unnecessary - checked by
+   * removing it, and the DTOs type-check against Prisma's input as they are.
+   * Prisma accepts an ISO-8601 string for a DateTime column, so `startsAt` and
+   * `endsAt` need no conversion either.
+   *
+   * Worth recording because a cast that is not load-bearing is worse than one
+   * that is: it silences every future mismatch in the same statement, and the
+   * next person has no way to tell it was decorative.
+   */
   create(dto: CreateBannerDto) {
-    return this.prisma.banner.create({ data: dto as any });
+    return this.prisma.banner.create({ data: dto });
   }
 
   async update(id: string, dto: UpdateBannerDto) {
     await this.findOneAdmin(id);
-    return this.prisma.banner.update({ where: { id }, data: dto as any });
+    return this.prisma.banner.update({ where: { id }, data: dto });
   }
 
   async remove(id: string) {

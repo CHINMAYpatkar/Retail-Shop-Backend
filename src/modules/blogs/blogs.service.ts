@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { slugify } from '../../common/utils/slugify';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
@@ -69,8 +69,23 @@ export class BlogsService {
     return this.prisma.blog.update({ where: { id }, data });
   }
 
+  /**
+   * Same reasoning as recipes: deleting is permanent and a post is real
+   * authoring effort, so a PUBLISHED post cannot be deleted outright.
+   *
+   * Unpublish first - which takes it off the storefront immediately and is
+   * reversible - then delete if you still mean to. `isPublished` is this
+   * model's equivalent of the `isActive` flag the pattern calls for.
+   */
   async remove(id: string) {
-    await this.findOneAdmin(id);
+    const blog = await this.findOneAdmin(id);
+
+    if (blog.isPublished) {
+      throw new BadRequestException(
+        'Unpublish this post before deleting it. Unpublishing removes it from the storefront straight away and can be undone; deleting cannot.',
+      );
+    }
+
     await this.prisma.blog.delete({ where: { id } });
     return { message: 'Blog post deleted' };
   }

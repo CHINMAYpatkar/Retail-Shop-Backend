@@ -5,7 +5,11 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: retail_shop
+      # Must match the database name in .env.example's DATABASE_URL. It did
+      # not: compose created `retail_shop` while the template connected to
+      # `RetailShop`, so a fresh clone that followed both got a connection
+      # error to a database that was never created.
+      POSTGRES_DB: RetailShop
     ports:
       - "5432:5432"
     volumes:

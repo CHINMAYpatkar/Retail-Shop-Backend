@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { slugify } from '../../common/utils/slugify';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
@@ -122,8 +122,28 @@ export class RecipesService {
     });
   }
 
+  /**
+   * Deleting a recipe is permanent - there is no soft delete here and no trash
+   * view, so a misclick loses real authoring effort with nothing to restore.
+   *
+   * Rather than add soft delete, this follows the pattern already documented
+   * for this project: for content that is expensive to recreate, the cheapest
+   * protection is `isActive: false`. So an ACTIVE recipe cannot be deleted at
+   * all - deactivate it first, which hides it from the storefront immediately
+   * and is trivially reversible.
+   *
+   * That turns an irreversible one-click mistake into a reversible two-step
+   * one, without a migration.
+   */
   async remove(id: string) {
-    await this.findOneAdmin(id);
+    const recipe = await this.findOneAdmin(id);
+
+    if (recipe.isActive) {
+      throw new BadRequestException(
+        'Deactivate this recipe before deleting it. Deactivating hides it from the storefront straight away and can be undone; deleting cannot.',
+      );
+    }
+
     await this.prisma.recipe.delete({ where: { id } });
     return { message: 'Recipe deleted' };
   }
