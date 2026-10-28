@@ -113,6 +113,123 @@ export async function createOrder(
   };
 }
 
+export interface MultiItemOrderFixture {
+  orderId: string;
+  orderNumber: string;
+  customerId: string;
+  /** Line ids in the order the lines were given, so a spec can name "the second one". */
+  itemIds: string[];
+  productIds: string[];
+  total: string;
+}
+
+/**
+ * An order with several lines, for the backorder specs.
+ *
+ * Separate from `createOrder` rather than an option on it, because almost
+ * every caller of that one wants exactly one line and would now have to index
+ * into an array to get it.
+ *
+ * `shippingAmount` matters here: the split-collection rule puts order-level
+ * charges on the first parcel, and a fixture with no charges cannot tell a
+ * correct implementation from one that silently drops them.
+ */
+export async function createMultiItemOrder(
+  prisma: PrismaService,
+  opts: {
+    lineTotals: string[];
+    status?: OrderStatus;
+    paymentStatus?: PaymentStatus;
+    shippingAmount?: string;
+    stockQuantity?: number;
+  },
+): Promise<MultiItemOrderFixture> {
+  const suffix = nextSuffix();
+  const shipping = new Prisma.Decimal(opts.shippingAmount ?? '0');
+  const subtotal = opts.lineTotals.reduce(
+    (sum, t) => sum.add(new Prisma.Decimal(t)),
+    new Prisma.Decimal(0),
+  );
+  const total = subtotal.add(shipping);
+
+  const customer = await prisma.customer.create({
+    data: {
+      name: `E2E Multi ${suffix}`,
+      email: `${E2E_TAG}multi-${suffix}@example.test`,
+      emailVerifiedAt: new Date(0),
+    },
+  });
+
+  const address = await prisma.address.create({
+    data: {
+      customerId: customer.id,
+      line1: '1 Test Street',
+      city: 'Pune',
+      state: 'MH',
+      postalCode: '411001',
+      country: 'India',
+      fullName: `E2E Multi ${suffix}`,
+      phone: '9999999999',
+    },
+  });
+
+  const category = await prisma.category.upsert({
+    where: { slug: `${E2E_TAG}category` },
+    update: {},
+    create: { name: 'E2E Category', slug: `${E2E_TAG}category` },
+  });
+
+  // Typed explicitly: an empty literal infers as never[], and every later
+  // read of product.id then fails to compile.
+  const products: { id: string; name: string }[] = [];
+  for (let i = 0; i < opts.lineTotals.length; i += 1) {
+    products.push(
+      await prisma.product.create({
+        data: {
+          name: `E2E Line ${suffix}-${i}`,
+          slug: `${E2E_TAG}line-${suffix}-${i}`,
+          categoryId: category.id,
+          price: new Prisma.Decimal(opts.lineTotals[i]),
+          stockQuantity: opts.stockQuantity ?? 100,
+          weightGrams: 100,
+        },
+      }),
+    );
+  }
+
+  const order = await prisma.order.create({
+    data: {
+      orderNumber: `${E2E_TAG}MULTI-${suffix}`,
+      customerId: customer.id,
+      addressId: address.id,
+      status: opts.status ?? OrderStatus.PROCESSING,
+      paymentStatus: opts.paymentStatus ?? PaymentStatus.PENDING,
+      subtotal,
+      shippingAmount: shipping,
+      totalAmount: total,
+      items: {
+        create: products.map((product, i) => ({
+          productId: product.id,
+          productName: product.name,
+          unitPrice: new Prisma.Decimal(opts.lineTotals[i]),
+          quantity: 1,
+          totalPrice: new Prisma.Decimal(opts.lineTotals[i]),
+        })),
+      },
+    },
+    include: { items: { orderBy: { productName: 'asc' } } },
+  });
+
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    customerId: customer.id,
+    itemIds: order.items.map((i) => i.id),
+    productIds: products.map((p) => p.id),
+    total: total.toFixed(2),
+  };
+}
+
 /** Removes every row these fixtures create, in FK-safe order. */
 export async function cleanupOrders(prisma: PrismaService): Promise<void> {
   const orders = await prisma.order.findMany({
@@ -122,6 +239,7 @@ export async function cleanupOrders(prisma: PrismaService): Promise<void> {
   const orderIds = orders.map((o) => o.id);
 
   if (orderIds.length) {
+    await prisma.orderPayment.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.orderStatusHistory.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });

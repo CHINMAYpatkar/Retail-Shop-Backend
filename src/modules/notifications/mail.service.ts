@@ -108,6 +108,62 @@ export class MailService implements OnModuleInit {
     await this.sendMail(to, `Order Update - ${orderNumber}`, body);
   }
 
+  /**
+   * One line of an order is out of stock.
+   *
+   * The tone matters more than usual here. This email arrives unprompted and
+   * carries bad news, so it leads with what is NOT happening - the order is
+   * not cancelled, nothing is being refunded, no action is needed - before the
+   * date. A customer who reads only the first sentence should still be calm.
+   */
+  async sendItemUnavailableEmail(
+    to: string,
+    details: {
+      orderNumber: string;
+      productName: string;
+      expectedDate: Date;
+      note?: string;
+      holdingWholeOrder: boolean;
+    },
+  ): Promise<void> {
+    const when = details.expectedDate.toLocaleDateString('en-IN', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+
+    const plan = details.holdingWholeOrder
+      ? `<p>We are holding your order together, so everything will arrive in one delivery once <b>${details.productName}</b> is ready.</p>`
+      : `<p>The rest of your order is on its way as planned. <b>${details.productName}</b> will follow in a second delivery as soon as it is ready, at no extra charge.</p>`;
+
+    const body = `
+      <p>Your order <b>${details.orderNumber}</b> is still on its way - nothing has been cancelled and there is nothing you need to do.</p>
+      <p>One item is taking a little longer than usual:</p>
+      <p style="margin: 16px 0; padding: 12px 16px; background: #f6f3ee; border-left: 3px solid #c8a24a;">
+        <b>${details.productName}</b><br />
+        Expected to be ready by <b>${when}</b>
+      </p>
+      ${details.note ? `<p>${details.note}</p>` : ''}
+      ${plan}
+      <p>We make everything in small batches, which is why this happens occasionally. Thank you for your patience.</p>
+    `;
+
+    await this.sendMail(to, `A small delay on order ${details.orderNumber}`, body);
+  }
+
+  /** The follow-up: the held line is back, and the order is moving again. */
+  async sendItemBackInStockEmail(
+    to: string,
+    orderNumber: string,
+    productName: string,
+  ): Promise<void> {
+    const body = `
+      <p>Good news - <b>${productName}</b> is ready, and your order <b>${orderNumber}</b> is moving again.</p>
+      <p>We will let you know as soon as it is on its way.</p>
+    `;
+    await this.sendMail(to, `${productName} is back - order ${orderNumber}`, body);
+  }
+
   /** Used by the admin "send test email" endpoint to self-verify SMTP end-to-end. */
   async sendTestEmail(to: string): Promise<{ success: boolean; error?: string }> {
     const body = `<p>This is a test email from your Retail Shop admin console, sent at ${new Date().toISOString()}.</p><p>If you're reading this, your SMTP configuration works.</p>`;

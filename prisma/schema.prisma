@@ -25,13 +25,38 @@ enum OrderStatus {
   PLACED
   CONFIRMED
   PROCESSING
+
+  /// Nothing can ship yet: every line, or the whole order by the shop's
+  /// choice, is waiting on stock. The order is still live - this is not a
+  /// cancellation and no refund is owed.
+  AWAITING_STOCK
+
   PACKED
   SHIPPED
+
+  /// Part of the order is on its way and part is still owed. Outranks
+  /// AWAITING_STOCK: once something is physically on a van, that is the more
+  /// informative thing to tell the customer.
+  PARTIALLY_SHIPPED
+
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
   RETURNED
   REFUNDED
+}
+
+/// Where one line of an order has got to.
+///
+/// Separate from OrderStatus because the moment one line is held back, a
+/// single status for the whole order is a lie about one half of it or the
+/// other. The order's status is DERIVED from these - see
+/// `order-fulfilment.ts`.
+enum OrderItemStatus {
+  PENDING
+  AWAITING_STOCK
+  SHIPPED
+  DELIVERED
 }
 
 enum PaymentMethod {
@@ -41,6 +66,12 @@ enum PaymentMethod {
 
 enum PaymentStatus {
   PENDING
+
+  /// Cash on delivery collected for one parcel of a split shipment, with the
+  /// rest still owed. Without this value a part-paid order could only be
+  /// recorded as unpaid or fully paid - both untrue.
+  PARTIALLY_PAID
+
   PAID
   FAILED
 
@@ -539,12 +570,19 @@ model Order {
   invoiceUrl     String?
   cancelledAt    DateTime?
   cancelReason   String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+
+  /// When a line is out of stock: true holds the whole order until it arrives,
+  /// false ships what is available and sends the rest on later. Set by the
+  /// admin at the moment a line is marked unavailable, never inferred.
+  holdForStock Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   items         OrderItem[]
   statusHistory OrderStatusHistory[]
   refunds       Refund[]
+  payments      OrderPayment[]
 
   @@map("orders")
 }
@@ -570,7 +608,45 @@ model OrderItem {
   /// Null for orders placed before cost sheets existed.
   unitCostPrice Decimal? @db.Decimal(12, 4)
 
+  fulfilmentStatus OrderItemStatus @default(PENDING)
+
+  /// When the shop expects to have this line again. Typed by a person who has
+  /// spoken to a supplier - never derived from a lead time, which would be a
+  /// guess wearing a date's clothes.
+  expectedAvailabilityDate DateTime?
+
+  /// Shown to the CUSTOMER alongside the date, so keep it in their language.
+  availabilityNote String?
+
   @@map("order_items")
+}
+
+/// One cash collection against an order.
+///
+/// Rows, not a running total: `paidAmount` is summed at read time, following
+/// the same rule as PurchaseBill. A stored total drifts the moment a row is
+/// edited or deleted, and nothing would notice.
+///
+/// A split shipment collects per parcel, so an order can have several of these.
+/// Order-level charges - shipping, tax, discount - ride with the FIRST
+/// collection rather than being prorated across parcels that did not each
+/// incur them.
+model OrderPayment {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount      Decimal  @db.Decimal(10, 2)
+  collectedAt DateTime @default(now())
+  note        String?
+
+  /// Admin user id, or "system" when a delivery transition recorded it.
+  recordedBy String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@map("order_payments")
 }
 
 model OrderStatusHistory {

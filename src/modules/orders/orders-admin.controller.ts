@@ -10,6 +10,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { OrdersService } from './orders.service';
 import { QueryOrdersAdminDto } from './dto/query-orders-admin.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { SetItemAvailabilityDto } from './dto/set-item-availability.dto';
 
 @ApiTags('Orders (Admin)')
 @ApiBearerAuth()
@@ -32,6 +33,24 @@ export class OrdersAdminController {
   @Get(':id/invoice')
   getInvoice(@Param('id') id: string) {
     return this.service.getInvoiceData(id);
+  }
+
+  /**
+   * Mark one line out of stock, or available again.
+   *
+   * Under `orders.update` rather than a permission of its own: this reschedules
+   * an order, which is squarely what updating an order means. A separate
+   * permission would be one more thing to grant and one more thing to forget.
+   */
+  @Patch(':id/items/:itemId/availability')
+  @RequirePermissions('orders.update')
+  setItemAvailability(
+    @Param('id') id: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: SetItemAvailabilityDto,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.service.setItemAvailability(id, itemId, dto, adminId);
   }
 
   @Patch(':id/status')
